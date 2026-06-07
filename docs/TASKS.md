@@ -372,12 +372,12 @@ Settings
 
 ## Job Discovery
 
-* [ ] Greenhouse connector implemented
-* [ ] Lever connector implemented
-* [ ] Remotive connector implemented
-* [ ] Arbeitnow connector implemented
-* [ ] Hard filtering implemented
-* [ ] Deduplication implemented
+* [x] Greenhouse connector implemented
+* [x] Lever connector implemented
+* [x] Remotive connector implemented
+* [x] Arbeitnow connector implemented
+* [x] Hard filtering implemented
+* [x] Deduplication implemented
 
 ## AI Matching
 
