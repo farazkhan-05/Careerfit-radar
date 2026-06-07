@@ -390,8 +390,8 @@ Settings
 
 ## Workflow
 
-* [ ] LangGraph workflow implemented
-* [ ] Workflow persistence implemented
+* [x] LangGraph workflow implemented
+* [x] Workflow persistence implemented
 
 ## API
 

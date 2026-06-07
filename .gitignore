@@ -49,6 +49,8 @@ exports/*
 !exports/.gitkeep
 uploads/*
 !uploads/.gitkeep
+workflow_runs/*
+!workflow_runs/.gitkeep
 tmp/
 temp/
 *.log
@@ -59,6 +61,7 @@ temp/
 node_modules/
 .streamlit/secrets.toml
 .streamlit/config.toml
+.langgraph_api/
 
 # IDE/editor and OS metadata
 .vscode/
