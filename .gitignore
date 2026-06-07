@@ -71,6 +71,8 @@ temp/
 node_modules/
 .streamlit/secrets.toml
 .streamlit/config.toml
+.streamlit/credentials.toml
+.streamlit/cache/
 .langgraph_api/
 .ipynb_checkpoints/
 

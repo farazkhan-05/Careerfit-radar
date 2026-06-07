@@ -406,7 +406,7 @@ Settings
 
 ## Frontend
 
-* [ ] Streamlit dashboard completed
+* [x] Streamlit dashboard completed
 
 ## Production Readiness
 
