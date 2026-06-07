@@ -395,14 +395,14 @@ Settings
 
 ## API
 
-* [ ] Resume routes completed
-* [ ] Profile routes completed
-* [ ] Job routes completed
-* [ ] Workflow routes completed
-* [ ] Application routes completed
-* [ ] Source routes completed
-* [ ] Export routes completed
-* [ ] Health routes completed
+* [x] Resume routes completed
+* [x] Profile routes completed
+* [x] Job routes completed
+* [x] Workflow routes completed
+* [x] Application routes completed
+* [x] Source routes completed
+* [x] Export routes completed
+* [x] Health routes completed
 
 ## Frontend
 
