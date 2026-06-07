@@ -385,8 +385,8 @@ Settings
 * [x] Job requirement extraction completed
 * [x] Embedding storage completed
 * [x] Semantic search completed
-* [ ] Fit scoring completed
-* [ ] Gap analysis completed
+* [x] Fit scoring completed
+* [x] Gap analysis completed
 
 ## Workflow
 
