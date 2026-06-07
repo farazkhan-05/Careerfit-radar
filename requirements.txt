@@ -1,0 +1,16 @@
+alembic
+beautifulsoup4
+fastapi
+google-cloud-logging
+google-cloud-secret-manager
+httpx
+langgraph
+mypy
+pgvector
+psycopg
+pydantic
+pydantic-settings
+pytest
+ruff
+sqlalchemy
+streamlit
