@@ -383,8 +383,8 @@ Settings
 
 * [x] Gemini integration completed
 * [x] Job requirement extraction completed
-* [ ] Embedding storage completed
-* [ ] Semantic search completed
+* [x] Embedding storage completed
+* [x] Semantic search completed
 * [ ] Fit scoring completed
 * [ ] Gap analysis completed
 
