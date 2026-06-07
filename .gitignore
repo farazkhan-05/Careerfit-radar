@@ -67,12 +67,12 @@ temp/
 *.sqlite
 *.sqlite3
 
-# Frontend and Streamlit local files
+# Frontend (React / Node)
 node_modules/
-.streamlit/secrets.toml
-.streamlit/config.toml
-.streamlit/credentials.toml
-.streamlit/cache/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
 .langgraph_api/
 .ipynb_checkpoints/
 

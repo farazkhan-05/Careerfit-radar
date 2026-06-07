@@ -45,7 +45,7 @@ This document defines the approved architecture and prevents unnecessary tooling
 ```text
 User
  ↓
-Streamlit Dashboard
+React Dashboard
  ↓
 FastAPI Backend
  ↓
@@ -62,15 +62,15 @@ Neon PostgreSQL + pgvector
 
 ### GCP Services
 
-| Component           | Service         |
-| ------------------- | --------------- |
-| Backend API         | Cloud Run       |
-| Streamlit Dashboard | Cloud Run       |
-| Scheduled Refresh   | Cloud Scheduler |
-| Secrets             | Secret Manager  |
-| Logging             | Cloud Logging   |
-| Database            | Neon PostgreSQL |
-| Vector Search       | pgvector        |
+| Component         | Service         |
+| ----------------- | --------------- |
+| Backend API       | Cloud Run       |
+| React Dashboard   | Cloud Run       |
+| Scheduled Refresh | Cloud Scheduler |
+| Secrets           | Secret Manager  |
+| Logging           | Cloud Logging   |
+| Database          | Neon PostgreSQL |
+| Vector Search     | pgvector        |
 
 ### Deployable Services
 
@@ -87,7 +87,7 @@ Responsibilities:
 * Gemini integration
 * Source connector execution
 
-#### Streamlit Dashboard
+#### React Dashboard
 
 Responsibilities:
 
@@ -99,11 +99,11 @@ Responsibilities:
 
 ### Service Separation
 
-FastAPI and Streamlit remain separate because:
+FastAPI and React remain separate because:
 
 * Backend workflows must not depend on frontend state.
 * Cloud Scheduler targets backend endpoints.
-* Frontend can later be replaced without backend changes.
+* Frontend can be replaced without backend changes.
 
 ---
 
@@ -169,7 +169,7 @@ The platform must never submit applications automatically.
 
 ## 6. Core Components
 
-### 6.1 Streamlit Dashboard
+### 6.1 React Dashboard
 
 Responsibilities:
 
@@ -185,7 +185,9 @@ Rules:
 
 * Communicate only through FastAPI APIs.
 * Contain no business logic.
-* No direct scraping, Gemini calls, scoring, embeddings, or database writes.
+* No direct Gemini calls.
+* No direct database writes.
+* API base URL configured via `VITE_API_URL` environment variable.
 
 ---
 
@@ -612,6 +614,7 @@ Preferences influence search, filtering, and scoring.
 * REST APIs
 * Pydantic request and response schemas
 * Predictable structured responses
+* CORS enabled for React frontend
 
 ### API Groups
 
@@ -701,4 +704,4 @@ Do not:
 * Scrape login-protected platforms.
 * Add LinkedIn, Indeed, Naukri, or Glassdoor scraping.
 * Bypass source access restrictions.
-* Move core business logic into the Streamlit frontend.
+* Move core business logic into the React frontend.

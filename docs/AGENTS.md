@@ -49,7 +49,7 @@ Never code from assumptions.
 * Skipping validation.
 * Excessive comments.
 * Direct Gemini calls from routes.
-* Direct database writes from Streamlit.
+* Direct database writes from the React frontend.
 
 ---
 
@@ -63,7 +63,6 @@ Chroma
 Redis
 Celery
 Kubernetes
-React
 Next.js
 LangChain unless explicitly needed
 OpenAI API
@@ -86,7 +85,7 @@ Multi-user SaaS features
 ```text
 Python
 FastAPI
-Streamlit
+React 18 + Vite + Tailwind CSS
 LangGraph
 Neon PostgreSQL
 pgvector
@@ -277,25 +276,27 @@ Rules:
 
 ### Frontend Agent
 
-Owns Streamlit UI.
+Owns the React dashboard.
 
 Rules:
 
-* Streamlit communicates through FastAPI only.
+* React communicates through FastAPI APIs only.
 * No direct Gemini calls.
 * No direct database writes.
-* Keep UI simple and useful.
-* Display score breakdowns and failure states.
+* API base URL from `VITE_API_URL` environment variable.
+* Keep UI simple, friendly, and useful.
+* Display score breakdowns and failure states clearly.
 * Never add auto-apply functionality.
+* No fake data or dead buttons.
 
 Required pages:
 
 ```text
 Dashboard
-Job Detail
-Resume Profile
-Application Tracker
-Source Health
+Resume Upload and Profile
+Find Jobs
+Job Matches
+Applications Tracker
 Settings
 ```
 
@@ -338,7 +339,7 @@ Rules:
 * Never hardcode secrets.
 * Use runtime environment variables.
 * Deploy backend and frontend separately.
-* Scheduler triggers FastAPI, not Streamlit.
+* Scheduler triggers FastAPI, not the React frontend.
 * Health checks must pass before deployment is complete.
 
 ---
@@ -352,6 +353,7 @@ ruff check .
 ruff format .
 mypy backend
 pytest
+cd frontend && npm run build
 ```
 
 All relevant tests must pass.

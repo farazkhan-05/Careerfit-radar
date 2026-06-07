@@ -1,5 +1,7 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
+from backend.config import get_settings
 from backend.routes import (
     application_routes,
     export_routes,
@@ -12,6 +14,15 @@ from backend.routes import (
 )
 
 app = FastAPI(title="CareerFit Radar")
+
+settings = get_settings()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/health", tags=["health"])

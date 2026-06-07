@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Body, Query
+from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -11,8 +11,24 @@ from backend.models import db_models
 from backend.models.api_schemas import PageResponse
 from backend.models.schemas import WorkflowRunCreate, WorkflowRunRead
 from backend.routes.crud import PaginationParams, create_entity, delete_entity, get_or_404, paginate, update_entity
+from backend.models.api_schemas import WorkflowTriggerResponse
+from backend.workflows.job_discovery_graph import JobDiscoveryWorkflow, WorkflowRunRepository
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
+
+
+@router.post("/run", response_model=WorkflowTriggerResponse, status_code=201)
+def trigger_workflow_run(db: Session = Depends(get_db)) -> WorkflowTriggerResponse:
+    run_id = f"manual-{uuid4()}"
+    repository = WorkflowRunRepository(db)
+    state = JobDiscoveryWorkflow(repository=repository).run({"run_id": run_id, "source_name": "manual"})
+    db.commit()
+    persisted = repository.get_run(run_id)
+    return WorkflowTriggerResponse(
+        run_id=run_id,
+        status=state["status"],
+        workflow_id=persisted.id if persisted is not None else None,
+    )
 
 
 @router.post("", response_model=WorkflowRunRead, status_code=201)

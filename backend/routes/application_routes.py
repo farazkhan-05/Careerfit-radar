@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Body, Query
+from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -13,6 +13,18 @@ from backend.models.schemas import ApplicationCreate, ApplicationRead
 from backend.routes.crud import PaginationParams, create_entity, delete_entity, get_or_404, paginate, update_entity
 
 router = APIRouter(prefix="/applications", tags=["applications"])
+
+
+@router.post("/jobs/{job_id}/save", response_model=ApplicationRead, status_code=201)
+def save_job_application(job_id: UUID, db: Session = Depends(get_db)) -> db_models.Application:
+    existing = db.execute(select(db_models.Application).where(db_models.Application.job_id == job_id)).scalar_one_or_none()
+    if existing is not None:
+        return existing
+    application = db_models.Application(job_id=job_id, status="saved")
+    db.add(application)
+    db.commit()
+    db.refresh(application)
+    return application
 
 
 @router.post("", response_model=ApplicationRead, status_code=201)

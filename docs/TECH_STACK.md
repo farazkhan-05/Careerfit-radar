@@ -14,7 +14,7 @@ This document defines the approved MVP technology stack. Only the technologies l
 | ---------------------- | -------------------------------------- |
 | Language               | Python 3.11+                           |
 | Backend API            | FastAPI                                |
-| Frontend               | Streamlit                              |
+| Frontend               | React 18 + Vite + Tailwind CSS         |
 | Workflow Orchestration | LangGraph                              |
 | Database               | Neon PostgreSQL                        |
 | Vector Search          | pgvector                               |
@@ -49,9 +49,9 @@ Primary language for APIs, workflows, source connectors, resume processing, scor
 
 Backend API framework. Route handlers must remain thin; business logic belongs in services and workflows.
 
-### Streamlit
+### React
 
-MVP frontend. Must communicate with FastAPI via HTTP APIs. React is not part of MVP.
+MVP frontend. Built with Vite, Tailwind CSS, React Router, TanStack Query, and Axios. Communicates with FastAPI via HTTP APIs only. API base URL is configured via `VITE_API_URL` environment variable.
 
 ### LangGraph
 
@@ -192,7 +192,8 @@ careerfit-radar/
 │   ├── database.py
 │   ├── models/
 │   │   ├── db_models.py
-│   │   └── schemas.py
+│   │   ├── schemas.py
+│   │   └── api_schemas.py
 │   ├── routes/
 │   │   ├── resume_routes.py
 │   │   ├── profile_routes.py
@@ -200,6 +201,7 @@ careerfit-radar/
 │   │   ├── workflow_routes.py
 │   │   ├── application_routes.py
 │   │   ├── source_routes.py
+│   │   ├── export_routes.py
 │   │   └── health_routes.py
 │   ├── services/
 │   │   ├── resume_parser.py
@@ -226,7 +228,19 @@ careerfit-radar/
 │       └── logging_utils.py
 │
 ├── frontend/
-│   └── streamlit_app.py
+│   ├── src/
+│   │   ├── api/          API client and endpoint modules
+│   │   ├── components/   Reusable UI and layout components
+│   │   ├── pages/        Page-level components
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   ├── public/
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.js
+│   ├── tailwind.config.js
+│   ├── nginx.conf
+│   └── .env.example
 │
 ├── migrations/
 ├── tests/
@@ -253,7 +267,6 @@ Chroma
 Redis
 Celery
 Kubernetes
-React
 Next.js
 Browser automation
 LinkedIn scraping

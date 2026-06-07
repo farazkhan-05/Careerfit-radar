@@ -175,7 +175,7 @@ The MVP includes:
 * Fit scoring
 * Gap analysis
 * Daily shortlist generation
-* Streamlit dashboard
+* React dashboard
 * Application tracker
 * CSV export
 * Google Cloud Run deployment

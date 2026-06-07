@@ -1,6 +1,6 @@
 alembic
 beautifulsoup4
-fastapi
+fastapi[standard]
 google-cloud-logging
 google-cloud-secret-manager
 google-genai
@@ -13,7 +13,7 @@ pydantic
 pydantic-settings
 pypdf
 python-docx
+python-multipart
 pytest
 ruff
 sqlalchemy
-streamlit

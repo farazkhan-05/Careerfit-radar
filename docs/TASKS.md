@@ -16,7 +16,8 @@ Build CareerFit Radar in incremental, testable phases. Each phase must produce a
 backend/main.py
 backend/config.py
 backend/database.py
-frontend/streamlit_app.py
+frontend/package.json
+frontend/src/main.jsx
 .env.example
 requirements.txt
 Dockerfile.backend
@@ -291,12 +292,21 @@ Health Checks
 
 ---
 
-## Phase 10: Streamlit Dashboard
+## Phase 10: React Dashboard
 
 ### Key Files
 
 ```text
-frontend/streamlit_app.py
+frontend/src/pages/Dashboard.jsx
+frontend/src/pages/Resume.jsx
+frontend/src/pages/FindJobs.jsx
+frontend/src/pages/Jobs.jsx
+frontend/src/pages/Applications.jsx
+frontend/src/pages/Settings.jsx
+frontend/src/api/client.js
+frontend/package.json
+frontend/vite.config.js
+frontend/.env.example
 ```
 
 ### Deliverables
@@ -305,18 +315,21 @@ Pages:
 
 ```text
 Dashboard
-Job Detail
-Resume Profile
-Application Tracker
-Source Health
-Settings
+Resume Upload and Profile
+Find Jobs (source import)
+Job Matches
+Applications Tracker
+Settings (health + exports)
 ```
 
 ### Acceptance Criteria
 
-* Dashboard runs locally.
-* Navigation works across pages.
-* API endpoint is configurable.
+* React app builds without errors.
+* Navigation works across all pages.
+* API base URL is configurable via VITE_API_URL.
+* All UI actions call real backend endpoints.
+* No fake data or dead buttons.
+* Responsive layout with loading and error states.
 
 ---
 
@@ -406,7 +419,7 @@ Settings
 
 ## Frontend
 
-* [x] Streamlit dashboard completed
+* [x] React dashboard completed
 
 ## Production Readiness
 
