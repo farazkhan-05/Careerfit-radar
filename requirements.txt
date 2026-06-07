@@ -7,7 +7,7 @@ httpx
 langgraph
 mypy
 pgvector
-psycopg
+psycopg[binary]
 pydantic
 pydantic-settings
 pytest
