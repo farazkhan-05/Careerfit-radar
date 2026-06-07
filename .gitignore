@@ -17,6 +17,8 @@ venv/
 env/
 ENV/
 .python-version
+.direnv/
+.envrc
 pip-wheel-metadata/
 
 # Packaging, build, and coverage outputs
@@ -29,6 +31,8 @@ site/
 .coverage.*
 coverage.xml
 htmlcov/
+reports/
+test-results/
 
 # Local environment and secrets
 .env
@@ -36,9 +40,15 @@ htmlcov/
 !.env.example
 *.pem
 *.key
+*.p12
+*.pfx
+*.crt
 *service-account*.json
+serviceAccount*.json
 gcp-key*.json
 google-credentials*.json
+credentials.json
+token.json
 
 # Private local app configuration
 config/candidate_profile_input.json
@@ -62,6 +72,7 @@ node_modules/
 .streamlit/secrets.toml
 .streamlit/config.toml
 .langgraph_api/
+.ipynb_checkpoints/
 
 # IDE/editor and OS metadata
 .vscode/
