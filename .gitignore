@@ -1,21 +1,73 @@
+# Python bytecode and caches
 __pycache__/
 *.py[cod]
 *.pyo
+*.pyd
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.pyre/
+.hypothesis/
+.dmypy.json
+dmypy.json
 
+# Virtual environments and local Python tooling
 .venv/
 venv/
 env/
+ENV/
+.python-version
+pip-wheel-metadata/
 
+# Packaging, build, and coverage outputs
+build/
+dist/
+site/
+*.egg-info/
+.eggs/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Local environment and secrets
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*service-account*.json
+gcp-key*.json
+google-credentials*.json
 
+# Private local app configuration
+config/candidate_profile_input.json
+config/*.local.json
+
+# Runtime-generated files
 exports/*
 !exports/.gitkeep
-
+uploads/*
+!uploads/.gitkeep
+tmp/
+temp/
 *.log
+*.sqlite
+*.sqlite3
+
+# Frontend and Streamlit local files
+node_modules/
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+# IDE/editor and OS metadata
+.vscode/
+.idea/
+*.swp
+*.swo
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Docker/local compose overrides
+docker-compose.override.yml

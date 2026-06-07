@@ -381,8 +381,8 @@ Settings
 
 ## AI Matching
 
-* [ ] Gemini integration completed
-* [ ] Job requirement extraction completed
+* [x] Gemini integration completed
+* [x] Job requirement extraction completed
 * [ ] Embedding storage completed
 * [ ] Semantic search completed
 * [ ] Fit scoring completed

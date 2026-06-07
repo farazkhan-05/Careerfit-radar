@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
@@ -27,7 +29,7 @@ def test_settings_load_required_environment() -> None:
 
 def test_settings_fail_when_required_environment_is_missing() -> None:
     try:
-        Settings()
+        cast(Any, Settings)(_env_file=None)
     except ValidationError as exc:
         missing_fields = {error["loc"][0] for error in exc.errors()}
     else:

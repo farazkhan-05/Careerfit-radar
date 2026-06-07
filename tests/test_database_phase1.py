@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from typing import Any, cast
 from uuid import uuid4
 
 from backend.config import Settings
@@ -78,14 +79,15 @@ def test_schemas_validate_sample_data() -> None:
         experience_years=2,
     )
     company = CompanyCreate(
-        name="Example Co", career_site_url="https://example.com/jobs"
+        name="Example Co",
+        career_site_url=cast(Any, "https://example.com/jobs"),
     )
     job = JobCreate(
         company_id=company_id,
         source="greenhouse",
         source_job_id="job-123",
         title="Backend Engineer",
-        apply_url="https://example.com/apply/job-123",
+        apply_url=cast(Any, "https://example.com/apply/job-123"),
         description="Build APIs",
         fetched_at=now,
     )
