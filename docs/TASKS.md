@@ -366,9 +366,9 @@ Settings
 
 ## Resume Intelligence
 
-* [ ] Resume parsing implemented
-* [ ] Resume chunking implemented
-* [ ] Candidate profile extraction implemented
+* [x] Resume parsing implemented
+* [x] Resume chunking implemented
+* [x] Candidate profile extraction implemented
 
 ## Job Discovery
 

@@ -3,6 +3,7 @@ beautifulsoup4
 fastapi
 google-cloud-logging
 google-cloud-secret-manager
+google-genai
 httpx
 langgraph
 mypy
@@ -10,6 +11,8 @@ pgvector
 psycopg[binary]
 pydantic
 pydantic-settings
+pypdf
+python-docx
 pytest
 ruff
 sqlalchemy
