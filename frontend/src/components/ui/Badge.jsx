@@ -36,10 +36,7 @@ export function StatusBadge({ status }) {
 
 export function SourceBadge({ source }) {
   const sourceColors = {
-    greenhouse: 'green',
-    lever: 'blue',
-    remotive: 'teal',
-    arbeitnow: 'orange',
+    apify: 'teal',
     manual: 'gray',
     smartrecruiters: 'violet',
   }

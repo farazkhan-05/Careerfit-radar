@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, ChevronUp, Plus, Sparkles, Zap } from 'lucide-react'
-import { importGreenhouse, importLever, importRemotive, importArbeitnow, listSourceRuns } from '../api/sources'
+import { importApify, listSourceRuns } from '../api/sources'
 import { createManualJob } from '../api/jobs'
 import { scoreJobs } from '../api/profiles'
 import { listProfiles } from '../api/profiles'
@@ -13,12 +13,12 @@ import EmptyState from '../components/ui/EmptyState'
 import Badge from '../components/ui/Badge'
 import { PageSpinner } from '../components/ui/Spinner'
 
-const SOURCE_COLORS = { greenhouse: 'green', lever: 'blue', remotive: 'teal', arbeitnow: 'orange' }
+const SOURCE_COLORS = { apify: 'teal' }
 
 function RunsTable({ runs }) {
   if (runs.length === 0) {
     return (
-      <EmptyState icon="📋" title="No imports yet" description="Import jobs from a source above to get started." />
+      <EmptyState icon="list" title="No imports yet" description="Import jobs from Apify to get started." />
     )
   }
   return (
@@ -56,10 +56,6 @@ function RunsTable({ runs }) {
 export default function FindJobs() {
   const queryClient = useQueryClient()
 
-  const [remotiveSearch, setRemotiveSearch] = useState('')
-  const [showAts, setShowAts] = useState(false)
-  const [greenhouseToken, setGreenhouseToken] = useState('')
-  const [leverSlug, setLeverSlug] = useState('')
   const [showManual, setShowManual] = useState(false)
   const [manualForm, setManualForm] = useState({ company_name: '', title: '', apply_url: '', location: '', remote_type: '', description: '' })
 
@@ -71,37 +67,19 @@ export default function FindJobs() {
   const profilesQ = useQuery({ queryKey: ['profiles'], queryFn: () => listProfiles(1, 0) })
   const profile = profilesQ.data?.items?.[0]
 
-  // Auto-suggest keyword from profile
-  const suggestedKeyword = profile?.target_roles?.[0] ?? ''
-
   function onImportSuccess(data, name) {
     queryClient.invalidateQueries({ queryKey: ['sourceRuns'] })
     queryClient.invalidateQueries({ queryKey: ['jobs'] })
     setImportMsg({ type: 'success', message: `${name}: ${data.jobs_stored} new job${data.jobs_stored !== 1 ? 's' : ''} added (${data.jobs_fetched} fetched).` })
   }
-  function onImportError(err) { setImportMsg({ type: 'error', message: err.message }) }
 
-  const remotiveMut = useMutation({
-    mutationFn: () => importRemotive(remotiveSearch || suggestedKeyword || undefined),
-    onSuccess: (d) => onImportSuccess(d, 'Remotive'),
-    onError: onImportError,
-  })
+  function onImportError(err) {
+    setImportMsg({ type: 'error', message: err.message })
+  }
 
-  const arbeitnowMut = useMutation({
-    mutationFn: importArbeitnow,
-    onSuccess: (d) => onImportSuccess(d, 'Arbeitnow'),
-    onError: onImportError,
-  })
-
-  const greenhouseMut = useMutation({
-    mutationFn: () => importGreenhouse(greenhouseToken),
-    onSuccess: (d) => onImportSuccess(d, 'Greenhouse'),
-    onError: onImportError,
-  })
-
-  const leverMut = useMutation({
-    mutationFn: () => importLever(leverSlug),
-    onSuccess: (d) => onImportSuccess(d, 'Lever'),
+  const apifyMut = useMutation({
+    mutationFn: importApify,
+    onSuccess: (d) => onImportSuccess(d, 'Apify'),
     onError: onImportError,
   })
 
@@ -129,7 +107,6 @@ export default function FindJobs() {
   })
 
   const runs = runsQ.data?.items ?? []
-  const anyImporting = remotiveMut.isPending || arbeitnowMut.isPending
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
@@ -138,7 +115,6 @@ export default function FindJobs() {
         <p className="text-slate-500 mt-1">Import jobs, then score them against your resume with AI</p>
       </div>
 
-      {/* Step 1 — Import */}
       <div className="flex items-center gap-3 mb-4">
         <div className="h-7 w-7 rounded-full bg-brand-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</div>
         <h2 className="text-base font-semibold text-slate-800">Import jobs</h2>
@@ -147,98 +123,23 @@ export default function FindJobs() {
       {importMsg?.type === 'success' && <SuccessMessage message={importMsg.message} className="mb-4" />}
       {importMsg?.type === 'error' && <ErrorMessage message={importMsg.message} className="mb-4" />}
 
-      <div className="space-y-3 mb-6">
-        {/* Remotive */}
-        <Card>
-          <div className="flex items-center gap-3 mb-3">
-            <span className="text-xl">🌍</span>
-            <div>
-              <div className="text-sm font-semibold text-slate-800">Remotive <span className="text-xs font-normal text-emerald-600 ml-1">General job board</span></div>
-              <div className="text-xs text-slate-500">Remote jobs across all industries and roles</div>
+      <Card className="mb-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold text-slate-800">
+              Apify <span className="text-xs font-normal text-emerald-600 ml-1">LinkedIn/Indeed</span>
             </div>
+            <div className="text-xs text-slate-500">India-focused software roles</div>
           </div>
-          <div className="flex gap-2">
-            <Input
-              placeholder={suggestedKeyword ? `e.g. "${suggestedKeyword}" (from your profile)` : 'Keyword — e.g. "python" or "product manager"'}
-              value={remotiveSearch}
-              onChange={(e) => setRemotiveSearch(e.target.value)}
-              className="flex-1"
-            />
-            <Button
-              loading={remotiveMut.isPending}
-              onClick={() => { setImportMsg(null); remotiveMut.mutate() }}
-              disabled={anyImporting && !remotiveMut.isPending}
-            >
-              Import
-            </Button>
-          </div>
-        </Card>
-
-        {/* Arbeitnow */}
-        <Card>
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <span className="text-xl">🤝</span>
-              <div>
-                <div className="text-sm font-semibold text-slate-800">Arbeitnow <span className="text-xs font-normal text-emerald-600 ml-1">General job board</span></div>
-                <div className="text-xs text-slate-500">International jobs — no keyword needed</div>
-              </div>
-            </div>
-            <Button
-              loading={arbeitnowMut.isPending}
-              onClick={() => { setImportMsg(null); arbeitnowMut.mutate() }}
-              disabled={anyImporting && !arbeitnowMut.isPending}
-            >
-              Import
-            </Button>
-          </div>
-        </Card>
-
-        {/* ATS boards — collapsed by default */}
-        <div className="border border-slate-200 rounded-xl overflow-hidden">
-          <button
-            onClick={() => setShowAts(v => !v)}
-            className="w-full flex items-center justify-between px-4 py-3 text-left bg-slate-50 hover:bg-slate-100 transition-colors"
+          <Button
+            loading={apifyMut.isPending}
+            onClick={() => { setImportMsg(null); apifyMut.mutate() }}
           >
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-slate-700">Company ATS boards</span>
-              <span className="text-xs text-slate-400 bg-white border border-slate-200 rounded px-1.5 py-0.5">Greenhouse · Lever</span>
-              <span className="text-xs text-amber-600">Needs company token</span>
-            </div>
-            {showAts ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
-          </button>
-
-          {showAts && (
-            <div className="p-4 space-y-4 border-t border-slate-200">
-              <p className="text-xs text-slate-500">These boards are company-specific. You need to know the company's ATS token (e.g. Stripe uses "stripe" on Greenhouse). Find it in the company's careers page URL.</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span>🌱</span>
-                    <span className="text-sm font-medium text-slate-700">Greenhouse</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <Input placeholder="Board token (e.g. stripe)" value={greenhouseToken} onChange={(e) => setGreenhouseToken(e.target.value)} />
-                    <Button size="sm" loading={greenhouseMut.isPending} onClick={() => { setImportMsg(null); greenhouseMut.mutate() }} disabled={!greenhouseToken}>Go</Button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span>⚙️</span>
-                    <span className="text-sm font-medium text-slate-700">Lever</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <Input placeholder="Company slug (e.g. netflix)" value={leverSlug} onChange={(e) => setLeverSlug(e.target.value)} />
-                    <Button size="sm" loading={leverMut.isPending} onClick={() => { setImportMsg(null); leverMut.mutate() }} disabled={!leverSlug}>Go</Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+            Import
+          </Button>
         </div>
-      </div>
+      </Card>
 
-      {/* Step 2 — Score */}
       <div className="flex items-center gap-3 mb-4">
         <div className="h-7 w-7 rounded-full bg-brand-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">2</div>
         <h2 className="text-base font-semibold text-slate-800">Score jobs against your profile</h2>
@@ -272,7 +173,6 @@ export default function FindJobs() {
         {scoreMsg?.type === 'error' && <ErrorMessage message={scoreMsg.message} className="mt-3" />}
       </Card>
 
-      {/* Step 3 — Manual */}
       <div className="flex items-center gap-3 mb-4">
         <div className="h-7 w-7 rounded-full bg-slate-300 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">3</div>
         <h2 className="text-base font-semibold text-slate-800">Add a job manually <span className="text-xs font-normal text-slate-400">(optional)</span></h2>
@@ -301,7 +201,7 @@ export default function FindJobs() {
                 <option value="onsite">On-site</option>
               </Select>
             </div>
-            <Textarea label="Job Description" placeholder="Paste the job description here…" rows={4} value={manualForm.description} onChange={(e) => setManualForm(f => ({ ...f, description: e.target.value }))} />
+            <Textarea label="Job Description" placeholder="Paste the job description here..." rows={4} value={manualForm.description} onChange={(e) => setManualForm(f => ({ ...f, description: e.target.value }))} />
             <div className="flex justify-end">
               <Button onClick={() => { setManualMsg(null); manualMut.mutate() }} loading={manualMut.isPending} disabled={!manualForm.company_name || !manualForm.title || !manualForm.apply_url || !manualForm.description}>
                 Add Job
@@ -311,7 +211,6 @@ export default function FindJobs() {
         )}
       </Card>
 
-      {/* Import history */}
       <Card>
         <CardHeader title="Import History" subtitle="Last 20 source runs" />
         {runsQ.isLoading ? <PageSpinner /> : <RunsTable runs={runs} />}

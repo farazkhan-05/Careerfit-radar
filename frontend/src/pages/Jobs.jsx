@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ExternalLink, BookmarkPlus, SlidersHorizontal, Trash2, Zap } from 'lucide-react'
+import { ExternalLink, BookmarkPlus, Trash2, Zap } from 'lucide-react'
 import { listJobs, deleteJob, deleteAllJobs } from '../api/jobs'
 import { saveJob } from '../api/applications'
 import { Card } from '../components/ui/Card'
@@ -153,11 +153,6 @@ export default function Jobs() {
   const totalPages = Math.ceil(total / PAGE_SIZE)
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1
 
-  function handleSearch(e) {
-    e.preventDefault()
-    setOffset(0)
-  }
-
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <div className="flex items-start justify-between mb-6">
@@ -207,10 +202,7 @@ export default function Jobs() {
           <div className="w-36">
             <Select value={source} onChange={(e) => { setSource(e.target.value); setOffset(0) }}>
               <option value="">All sources</option>
-              <option value="remotive">Remotive</option>
-              <option value="arbeitnow">Arbeitnow</option>
-              <option value="greenhouse">Greenhouse</option>
-              <option value="lever">Lever</option>
+              <option value="apify">Apify</option>
               <option value="manual">Manual</option>
             </Select>
           </div>

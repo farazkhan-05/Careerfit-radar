@@ -99,10 +99,7 @@ backend/services/candidate_profile_service.py
 
 ```text
 backend/sources/base_source.py
-backend/sources/greenhouse_source.py
-backend/sources/lever_source.py
-backend/sources/remotive_source.py
-backend/sources/arbeitnow_source.py
+backend/sources/apify_source.py
 backend/sources/smartrecruiters_source.py
 ```
 

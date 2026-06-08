@@ -11,57 +11,15 @@ from backend.models import db_models
 from backend.models.api_schemas import PageResponse, SourceImportResponse
 from backend.models.schemas import SourceRunCreate, SourceRunRead
 from backend.routes.crud import PaginationParams, create_entity, delete_entity, get_or_404, paginate, update_entity
-from backend.sources.arbeitnow_source import ArbeitnowSource
+from backend.sources.apify_source import ApifySource
 from backend.sources.base_source import NormalizedJob, SourceStatus
-from backend.sources.greenhouse_source import GreenhouseSource
-from backend.sources.lever_source import LeverSource
-from backend.sources.remotive_source import RemotiveSource
 
 router = APIRouter(prefix="/sources", tags=["sources"])
 
 
-@router.post("/import/greenhouse", response_model=SourceImportResponse)
-def import_greenhouse_jobs(
-    board_token: str = Query(..., min_length=1),
-    db: Session = Depends(get_db),
-) -> SourceImportResponse:
-    source = GreenhouseSource(board_token=board_token)
-    try:
-        result = source.fetch_jobs()
-    finally:
-        source.close()
-    return _store_source_result(db, result.source_name, result.status.value, result.jobs, result.error_message)
-
-
-@router.post("/import/lever", response_model=SourceImportResponse)
-def import_lever_jobs(
-    company_slug: str = Query(..., min_length=1),
-    db: Session = Depends(get_db),
-) -> SourceImportResponse:
-    source = LeverSource(company_slug=company_slug)
-    try:
-        result = source.fetch_jobs()
-    finally:
-        source.close()
-    return _store_source_result(db, result.source_name, result.status.value, result.jobs, result.error_message)
-
-
-@router.post("/import/remotive", response_model=SourceImportResponse)
-def import_remotive_jobs(
-    search: str | None = Query(default=None),
-    db: Session = Depends(get_db),
-) -> SourceImportResponse:
-    source = RemotiveSource(search=search)
-    try:
-        result = source.fetch_jobs()
-    finally:
-        source.close()
-    return _store_source_result(db, result.source_name, result.status.value, result.jobs, result.error_message)
-
-
-@router.post("/import/arbeitnow", response_model=SourceImportResponse)
-def import_arbeitnow_jobs(db: Session = Depends(get_db)) -> SourceImportResponse:
-    source = ArbeitnowSource()
+@router.post("/import/apify", response_model=SourceImportResponse)
+def import_apify_jobs(db: Session = Depends(get_db)) -> SourceImportResponse:
+    source = ApifySource()
     try:
         result = source.fetch_jobs()
     finally:

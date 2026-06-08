@@ -215,10 +215,7 @@ careerfit-radar/
 │   │   └── export_service.py
 │   ├── sources/
 │   │   ├── base_source.py
-│   │   ├── greenhouse_source.py
-│   │   ├── lever_source.py
-│   │   ├── remotive_source.py
-│   │   ├── arbeitnow_source.py
+│   │   ├── apify_source.py
 │   │   └── smartrecruiters_source.py
 │   ├── workflows/
 │   │   └── job_discovery_graph.py

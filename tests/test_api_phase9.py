@@ -105,10 +105,7 @@ def test_phase9_routers_are_registered() -> None:
     assert "/workflows" in paths
     assert "/applications" in paths
     assert "/sources/runs" in paths
-    assert "/sources/import/greenhouse" in paths
-    assert "/sources/import/lever" in paths
-    assert "/sources/import/remotive" in paths
-    assert "/sources/import/arbeitnow" in paths
+    assert "/sources/import/apify" in paths
     assert "/exports/jobs.csv" in paths
     assert "/health/ready" in paths
 

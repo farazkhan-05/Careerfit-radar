@@ -1,71 +1,57 @@
 from __future__ import annotations
 
-import httpx
+from typing import Any, Mapping
 
-from backend.sources import (
-    ArbeitnowSource,
-    GreenhouseSource,
-    LeverSource,
-    RemotiveSource,
-    SmartRecruitersSource,
-    SourceStatus,
-)
+from backend.sources import ApifySource, SmartRecruitersSource, SourceStatus
 
 
-def _client(response_payload: object, status_code: int = 200) -> httpx.Client:
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(status_code, json=response_payload, request=request)
+class FakeActorClient:
+    def __init__(self, dataset_id: str) -> None:
+        self.dataset_id = dataset_id
+        self.run_input: Mapping[str, Any] | None = None
 
-    return httpx.Client(transport=httpx.MockTransport(handler))
-
-
-def test_greenhouse_returns_normalized_jobs() -> None:
-    source = GreenhouseSource(
-        board_token="acme",
-        client=_client(
-            {
-                "jobs": [
-                    {
-                        "id": 123,
-                        "title": "Backend Engineer",
-                        "absolute_url": "https://boards.greenhouse.io/acme/jobs/123",
-                        "content": "<p>Build APIs</p>",
-                        "offices": [{"name": "Remote"}],
-                        "departments": [{"name": "Engineering"}],
-                    }
-                ]
-            }
-        ),
-    )
-
-    result = source.fetch_jobs()
-
-    assert result.status == SourceStatus.SUCCESS
-    assert len(result.jobs) == 1
-    job = result.jobs[0]
-    assert job.source == "greenhouse"
-    assert job.source_job_id == "123"
-    assert job.company_name == "acme"
-    assert job.remote_type == "remote"
-    assert job.source_metadata["department_names"] == ["Engineering"]
+    def call(self, *, run_input: Mapping[str, Any], **kwargs: Any) -> dict[str, str]:
+        self.run_input = run_input
+        return {"id": "run-1", "defaultDatasetId": self.dataset_id}
 
 
-def test_lever_returns_normalized_jobs() -> None:
-    source = LeverSource(
-        company_slug="acme",
-        client=_client(
+class FakeDatasetClient:
+    def __init__(self, items: list[dict[str, Any]]) -> None:
+        self.items = items
+
+    def iterate_items(self, **kwargs: Any) -> list[dict[str, Any]]:
+        return self.items
+
+
+class FakeApifyClient:
+    def __init__(self, items: list[dict[str, Any]]) -> None:
+        self.actor_client = FakeActorClient("dataset-1")
+        self.dataset_client = FakeDatasetClient(items)
+
+    def actor(self, actor_id: str) -> FakeActorClient:
+        return self.actor_client
+
+    def dataset(self, dataset_id: str) -> FakeDatasetClient:
+        return self.dataset_client
+
+
+def test_apify_returns_normalized_jobs() -> None:
+    source = ApifySource(
+        api_token="test-token",
+        apify_client=FakeApifyClient(
             [
                 {
-                    "id": "abc",
-                    "text": "Data Engineer",
-                    "hostedUrl": "https://jobs.lever.co/acme/abc",
-                    "descriptionPlain": "Own data pipelines",
-                    "createdAt": 1767225600000,
-                    "categories": {
-                        "location": "Berlin",
-                        "team": "Engineering",
-                        "commitment": "Full-time",
-                    },
+                    "id": "indeed-1",
+                    "title": "Associate Software Engineer",
+                    "companyName": "Acme",
+                    "location": "Lucknow, Uttar Pradesh",
+                    "jobUrl": "https://example.com/jobs/indeed-1",
+                    "description": "Build frontend and API features.",
+                    "datePosted": "2026-01-01T12:00:00Z",
+                    "jobType": "Full-time",
+                    "platform": "indeed",
+                    "searchQuery": "Associate Software Engineer",
+                    "searchLocation": "Lucknow, Uttar Pradesh",
                 }
             ]
         ),
@@ -74,86 +60,72 @@ def test_lever_returns_normalized_jobs() -> None:
     result = source.fetch_jobs()
 
     assert result.status == SourceStatus.SUCCESS
-    assert result.jobs[0].source == "lever"
-    assert result.jobs[0].posted_at is not None
-    assert result.jobs[0].location == "Berlin"
+    assert len(result.jobs) == 1
+    job = result.jobs[0]
+    assert job.source == "apify"
+    assert job.source_job_id == "indeed-1"
+    assert job.company_name == "Acme"
+    assert job.title == "Associate Software Engineer"
+    assert job.location == "Lucknow, Uttar Pradesh"
+    assert job.posted_at is not None
+    assert job.source_metadata["platform"] == "indeed"
+    assert result.metadata["actor_id"] == "openclawai/job-board-scraper"
 
 
-def test_remotive_returns_normalized_jobs() -> None:
-    source = RemotiveSource(
-        search="python",
-        client=_client(
-            {
-                "jobs": [
-                    {
-                        "id": 99,
-                        "title": "Python Developer",
-                        "url": "https://remotive.com/remote-jobs/software-dev/python-developer-99",
-                        "company_name": "Acme",
-                        "candidate_required_location": "Worldwide",
-                        "publication_date": "2026-01-01T12:00:00Z",
-                        "description": "Build services",
-                        "tags": ["python"],
-                    }
-                ]
-            }
-        ),
-    )
+def test_apify_builds_india_full_time_search_payload() -> None:
+    fake_client = FakeApifyClient([])
+    source = ApifySource(api_token="test-token", apify_client=fake_client)
 
     result = source.fetch_jobs()
 
     assert result.status == SourceStatus.SUCCESS
-    assert result.jobs[0].source == "remotive"
-    assert result.jobs[0].remote_type == "remote"
-    assert result.metadata["search"] == "python"
+    run_input = fake_client.actor_client.run_input
+    assert run_input is not None
+    searches = run_input["searchTerms"]
+    assert {"Associate Software Engineer", "Front End Developer"} == {
+        search for search in searches
+    }
+    assert run_input["sites"] == ["linkedin", "indeed"]
+    assert run_input["location"] == "Lucknow, Uttar Pradesh, India"
+    assert run_input["countryIndeed"] == "india"
+    assert run_input["jobType"] == "fulltime"
+    assert run_input["distance"] == 50
 
 
-def test_arbeitnow_returns_normalized_jobs() -> None:
-    source = ArbeitnowSource(
-        client=_client(
-            {
-                "data": [
-                    {
-                        "slug": "backend-engineer-acme",
-                        "title": "Backend Engineer",
-                        "url": "https://www.arbeitnow.com/jobs/companies/acme/backend-engineer",
-                        "company_name": "Acme",
-                        "location": "Germany",
-                        "created_at": "2026-01-01T12:00:00Z",
-                        "description": "Build APIs",
-                        "tags": ["remote"],
-                        "job_types": ["full-time"],
-                    }
-                ],
-                "links": {},
-                "meta": {},
-            }
-        ),
-    )
-
-    result = source.fetch_jobs()
-
-    assert result.status == SourceStatus.SUCCESS
-    assert result.jobs[0].source == "arbeitnow"
-    assert result.jobs[0].remote_type == "remote"
-    assert result.jobs[0].source_metadata["job_types"] == ["full-time"]
-
-
-def test_network_failures_are_handled_safely() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        raise httpx.ConnectError("connection failed", request=request)
-
-    source = RemotiveSource(client=httpx.Client(transport=httpx.MockTransport(handler)))
+def test_apify_missing_token_is_handled_safely() -> None:
+    source = ApifySource(api_token="")
 
     result = source.fetch_jobs()
 
     assert result.status == SourceStatus.FAILED
     assert result.jobs == ()
-    assert "connection failed" in (result.error_message or "")
+    assert "APIFY_API_TOKEN" in (result.error_message or "")
+
+
+def test_apify_skips_incomplete_items() -> None:
+    source = ApifySource(
+        api_token="test-token",
+        apify_client=FakeApifyClient(
+            [
+                {"title": "Missing URL", "companyName": "Acme"},
+                {
+                    "title": "Front End Developer",
+                    "companyName": "Acme",
+                    "url": "https://example.com/jobs/frontend",
+                },
+            ]
+        ),
+    )
+
+    result = source.fetch_jobs()
+
+    assert result.status == SourceStatus.SUCCESS
+    assert len(result.jobs) == 1
+    assert result.metadata["skipped_count"] == 1
 
 
 def test_smartrecruiters_is_disabled_by_default() -> None:
-    source = SmartRecruitersSource(company_slug="acme", client=_client({}))
+    source = SmartRecruitersSource(company_slug="acme")
 
     result = source.fetch_jobs()
 

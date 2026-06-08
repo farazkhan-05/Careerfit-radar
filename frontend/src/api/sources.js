@@ -1,28 +1,7 @@
 import apiClient from './client'
 
-export async function importGreenhouse(boardToken) {
-  const { data } = await apiClient.post('/sources/import/greenhouse', null, {
-    params: { board_token: boardToken },
-  })
-  return data
-}
-
-export async function importLever(companySlug) {
-  const { data } = await apiClient.post('/sources/import/lever', null, {
-    params: { company_slug: companySlug },
-  })
-  return data
-}
-
-export async function importRemotive(search) {
-  const params = {}
-  if (search) params.search = search
-  const { data } = await apiClient.post('/sources/import/remotive', null, { params })
-  return data
-}
-
-export async function importArbeitnow() {
-  const { data } = await apiClient.post('/sources/import/arbeitnow')
+export async function importApify() {
+  const { data } = await apiClient.post('/sources/import/apify')
   return data
 }
 
