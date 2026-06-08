@@ -1,34 +1,110 @@
 from __future__ import annotations
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Body, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.database import get_db
+from backend.database import SessionLocal, get_db
 from backend.models import db_models
-from backend.models.api_schemas import ApifyImportRequest, PageResponse, SourceImportResponse
+from backend.models.api_schemas import ApifyImportRequest, PageResponse, SourceImportResponse, WorkflowTriggerResponse
 from backend.models.schemas import SourceRunCreate, SourceRunRead
 from backend.routes.crud import PaginationParams, create_entity, delete_entity, get_or_404, paginate, update_entity
 from backend.sources.apify_source import ApifySource
 from backend.sources.base_source import NormalizedJob, SourceStatus
+from backend.workflows.job_discovery_graph import (
+    JobDiscoveryWorkflow,
+    JobDiscoveryWorkflowDependencies,
+    WorkflowRunRepository,
+    create_initial_state,
+)
 
 router = APIRouter(prefix="/sources", tags=["sources"])
 
 
-@router.post("/import/apify", response_model=SourceImportResponse)
+@router.post("/import/apify", response_model=WorkflowTriggerResponse, status_code=status.HTTP_202_ACCEPTED)
 def import_apify_jobs(
+    background_tasks: BackgroundTasks,
     payload: ApifyImportRequest | None = Body(default=None),
     db: Session = Depends(get_db),
-) -> SourceImportResponse:
+) -> WorkflowTriggerResponse:
     search = payload or ApifyImportRequest()
+    run_id = f"apify-{uuid4()}"
+    repository = WorkflowRunRepository(db)
+    persisted = repository.save_state(
+        create_initial_state(
+            {
+                "run_id": run_id,
+                "source_name": "apify",
+                "status": "running",
+                "search": {"query": search.query, "location": search.location},
+            }
+        )
+    )
+    db.commit()
+    background_tasks.add_task(_run_apify_import_workflow, run_id, search.query, search.location)
+    return WorkflowTriggerResponse(run_id=run_id, status="running", workflow_id=persisted.id)
+
+
+def _run_apify_import_workflow(run_id: str, query: str, location: str) -> None:
+    session_factory = SessionLocal()
+    with session_factory() as db:
+        repository = WorkflowRunRepository(db)
+        dependencies = JobDiscoveryWorkflowDependencies(
+            fetch_sources=lambda state: [_fetch_and_store_apify_jobs(db, query, location)]
+        )
+        workflow = JobDiscoveryWorkflow(dependencies=dependencies, repository=repository)
+        try:
+            workflow.run(
+                {
+                    "run_id": run_id,
+                    "source_name": "apify",
+                    "search": {"query": query, "location": location},
+                }
+            )
+            db.commit()
+        except Exception as exc:
+            _mark_workflow_failed(db, repository, run_id, exc)
+
+
+def _fetch_and_store_apify_jobs(db: Session, query: str, location: str) -> dict[str, object]:
     source = ApifySource()
     try:
-        result = source.fetch_jobs(query=search.query, location=search.location)
+        result = source.fetch_jobs(query=query, location=location)
     finally:
         source.close()
-    return _store_source_result(db, result.source_name, result.status.value, result.jobs, result.error_message)
+    response = _store_source_result(db, result.source_name, result.status.value, result.jobs, result.error_message)
+    return response.model_dump(mode="json")
+
+
+def _mark_workflow_failed(
+    db: Session,
+    repository: WorkflowRunRepository,
+    run_id: str,
+    exc: Exception,
+) -> None:
+    existing = repository.get_run(run_id)
+    state = dict(existing.state) if existing is not None and isinstance(existing.state, dict) else create_initial_state(
+        {"run_id": run_id, "source_name": "apify"}
+    )
+    errors = list(state.get("errors", []))
+    errors.append(
+        {
+            "node": "background_task",
+            "message": str(exc),
+            "timestamp": datetime_now().isoformat(),
+        }
+    )
+    repository.save_state(
+        {
+            **state,
+            "status": "failed",
+            "completed_at": datetime_now().isoformat(),
+            "errors": errors,
+        }
+    )
+    db.commit()
 
 
 @router.post("/runs", response_model=SourceRunRead, status_code=201)

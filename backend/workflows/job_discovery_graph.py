@@ -22,6 +22,7 @@ class JobDiscoveryState(TypedDict):
     status: str
     started_at: str
     source_name: NotRequired[str | None]
+    search: NotRequired[dict[str, Any]]
     completed_at: NotRequired[str | None]
     preferences: NotRequired[dict[str, Any]]
     source_results: NotRequired[list[dict[str, Any]]]
@@ -315,7 +316,7 @@ def build_job_discovery_graph(workflow: JobDiscoveryWorkflow) -> Any:
 def create_initial_state(initial_state: Mapping[str, Any] | None = None) -> JobDiscoveryState:
     values = dict(initial_state or {})
     started_at = str(values.get("started_at") or _utc_now())
-    return {
+    state: JobDiscoveryState = {
         "run_id": str(values.get("run_id") or uuid.uuid4()),
         "source_name": cast(str | None, values.get("source_name")),
         "status": str(values.get("status") or "pending"),
@@ -323,6 +324,9 @@ def create_initial_state(initial_state: Mapping[str, Any] | None = None) -> JobD
         "history": list(values.get("history", [])),
         "errors": list(values.get("errors", [])),
     }
+    if isinstance(values.get("search"), Mapping):
+        state["search"] = dict(cast(Mapping[str, Any], values["search"]))
+    return state
 
 
 def error_handler_node(

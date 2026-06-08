@@ -31,6 +31,9 @@ class FakeResult:
     def scalar_one(self) -> int:
         return self._scalar if self._scalar is not None else len(self._values)
 
+    def scalar_one_or_none(self) -> Any:
+        return self._values[0] if self._values else None
+
     def scalars(self) -> FakeScalarResult:
         return FakeScalarResult(self._values)
 
@@ -49,6 +52,9 @@ class FakeSession:
 
     def refresh(self, entity: Any) -> None:
         self._ensure_identity(entity)
+
+    def flush(self) -> None:
+        pass
 
     def delete(self, entity: Any) -> None:
         self.deleted.append(entity)
@@ -92,6 +98,25 @@ def _client_with_session(session: FakeSession) -> TestClient:
 
     app.dependency_overrides[get_db] = override_db
     return TestClient(app)
+
+
+class FakeSessionContext:
+    def __init__(self, session: FakeSession) -> None:
+        self._session = session
+
+    def __enter__(self) -> FakeSession:
+        return self._session
+
+    def __exit__(self, *_args: Any) -> None:
+        pass
+
+
+class FakeSessionFactory:
+    def __init__(self, session: FakeSession) -> None:
+        self._session = session
+
+    def __call__(self) -> FakeSessionContext:
+        return FakeSessionContext(self._session)
 
 
 def teardown_function() -> None:
@@ -176,7 +201,7 @@ def test_csv_export_returns_jobs_csv() -> None:
     assert "Backend Engineer" in response.text
 
 
-def test_apify_import_route_passes_dynamic_search_payload(monkeypatch: Any) -> None:
+def test_apify_import_route_queues_background_workflow(monkeypatch: Any) -> None:
     session = FakeSession()
     client = _client_with_session(session)
     captured: dict[str, Any] = {}
@@ -199,19 +224,44 @@ def test_apify_import_route_passes_dynamic_search_payload(monkeypatch: Any) -> N
             captured["closed"] = True
 
     monkeypatch.setattr(source_routes, "ApifySource", FakeApifySource)
+    monkeypatch.setattr(source_routes, "SessionLocal", lambda: FakeSessionFactory(session))
 
     response = client.post(
         "/sources/import/apify",
         json={"query": "React Engineer", "location": "Bengaluru, India"},
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 202
+    assert response.json()["status"] == "running"
+    assert response.json()["run_id"].startswith("apify-")
     assert captured == {
         "query": "React Engineer",
         "location": "Bengaluru, India",
         "closed": True,
     }
-    assert response.json()["source_name"] == "apify"
+    workflow_run = next(iter(session.entities[db_models.WorkflowRun].values()))
+    assert workflow_run.run_id == response.json()["run_id"]
+    assert workflow_run.status == "completed"
+    assert workflow_run.state["source_results"][0]["jobs_fetched"] == 0
+
+
+def test_workflow_run_can_be_read_by_run_id() -> None:
+    session = FakeSession()
+    workflow_run = db_models.WorkflowRun(
+        run_id="apify-test-run",
+        source_name="apify",
+        status="running",
+        started_at=datetime.now(UTC),
+        state={"run_id": "apify-test-run", "status": "running"},
+        errors=[],
+    )
+    session.add(workflow_run)
+    client = _client_with_session(session)
+
+    response = client.get("/workflows/apify-test-run")
+
+    assert response.status_code == 200
+    assert response.json()["run_id"] == "apify-test-run"
 
 
 def test_health_readiness_checks_database_and_gemini_config() -> None:

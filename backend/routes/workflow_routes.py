@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Body, Depends, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -49,8 +49,16 @@ def list_workflow_runs(
 
 
 @router.get("/{workflow_id}", response_model=WorkflowRunRead)
-def get_workflow_run(workflow_id: UUID, db: Session = Depends(get_db)) -> db_models.WorkflowRun:
-    return get_or_404(db, db_models.WorkflowRun, workflow_id)
+def get_workflow_run(workflow_id: str, db: Session = Depends(get_db)) -> db_models.WorkflowRun:
+    try:
+        return get_or_404(db, db_models.WorkflowRun, UUID(workflow_id))
+    except ValueError:
+        workflow = db.execute(
+            select(db_models.WorkflowRun).where(db_models.WorkflowRun.run_id == workflow_id)
+        ).scalar_one_or_none()
+        if workflow is None:
+            raise HTTPException(status_code=404, detail="WorkflowRun not found")
+        return workflow
 
 
 @router.patch("/{workflow_id}", response_model=WorkflowRunRead)

@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, ChevronUp, Plus, Sparkles, Zap } from 'lucide-react'
 import { importApify, listSourceRuns } from '../api/sources'
+import { getWorkflowRun } from '../api/workflows'
 import { createManualJob } from '../api/jobs'
 import { scoreJobs } from '../api/profiles'
 import { listProfiles } from '../api/profiles'
@@ -14,6 +15,7 @@ import Badge from '../components/ui/Badge'
 import { PageSpinner } from '../components/ui/Spinner'
 
 const SOURCE_COLORS = { apify: 'teal' }
+const TERMINAL_WORKFLOW_STATUSES = new Set(['completed', 'completed_with_errors', 'failed'])
 
 function RunsTable({ runs }) {
   if (runs.length === 0) {
@@ -59,6 +61,7 @@ export default function FindJobs() {
   const [showManual, setShowManual] = useState(false)
   const [manualForm, setManualForm] = useState({ company_name: '', title: '', apply_url: '', location: '', remote_type: '', description: '' })
   const [apifySearch, setApifySearch] = useState({ query: 'Front End Developer', location: 'Lucknow, India' })
+  const [activeImportRunId, setActiveImportRunId] = useState(null)
 
   const [importMsg, setImportMsg] = useState(null)
   const [scoreMsg, setScoreMsg] = useState(null)
@@ -66,23 +69,65 @@ export default function FindJobs() {
 
   const runsQ = useQuery({ queryKey: ['sourceRuns'], queryFn: () => listSourceRuns({ limit: 20 }) })
   const profilesQ = useQuery({ queryKey: ['profiles'], queryFn: () => listProfiles(1, 0) })
+  const apifyRunQ = useQuery({
+    queryKey: ['workflowRun', activeImportRunId],
+    queryFn: () => getWorkflowRun(activeImportRunId),
+    enabled: Boolean(activeImportRunId),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status
+      return status && TERMINAL_WORKFLOW_STATUSES.has(status) ? false : 3000
+    },
+    retry: 3,
+  })
   const profile = profilesQ.data?.items?.[0]
+  const isApifyPolling = Boolean(activeImportRunId)
 
-  function onImportSuccess(data, name) {
+  const onImportSuccess = useCallback((data, name) => {
     queryClient.invalidateQueries({ queryKey: ['sourceRuns'] })
     queryClient.invalidateQueries({ queryKey: ['jobs'] })
     setImportMsg({ type: 'success', message: `${name}: ${data.jobs_stored} new job${data.jobs_stored !== 1 ? 's' : ''} added (${data.jobs_fetched} fetched).` })
-  }
+  }, [queryClient])
 
-  function onImportError(err) {
+  const onImportError = useCallback((err) => {
     setImportMsg({ type: 'error', message: err.message })
-  }
+  }, [])
 
   const apifyMut = useMutation({
     mutationFn: importApify,
-    onSuccess: (d) => onImportSuccess(d, 'Apify'),
+    onSuccess: (data) => {
+      setActiveImportRunId(data.run_id)
+      queryClient.invalidateQueries({ queryKey: ['workflowRun', data.run_id] })
+    },
     onError: onImportError,
   })
+
+  useEffect(() => {
+    if (!activeImportRunId || !apifyRunQ.data) {
+      return
+    }
+
+    if (apifyRunQ.data.status === 'completed') {
+      onImportSuccess(getApifyImportSummary(apifyRunQ.data), 'Apify')
+      setActiveImportRunId(null)
+      return
+    }
+
+    if (TERMINAL_WORKFLOW_STATUSES.has(apifyRunQ.data.status)) {
+      const errorMessage = getWorkflowErrorMessage(apifyRunQ.data)
+      queryClient.invalidateQueries({ queryKey: ['sourceRuns'] })
+      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      setImportMsg({ type: 'error', message: `Apify import ${apifyRunQ.data.status}: ${errorMessage}` })
+      setActiveImportRunId(null)
+    }
+  }, [activeImportRunId, apifyRunQ.data, onImportSuccess, queryClient])
+
+  useEffect(() => {
+    if (!activeImportRunId || !apifyRunQ.isError) {
+      return
+    }
+    setImportMsg({ type: 'error', message: apifyRunQ.error.message })
+    setActiveImportRunId(null)
+  }, [activeImportRunId, apifyRunQ.error, apifyRunQ.isError])
 
   const scoreMut = useMutation({
     mutationFn: scoreJobs,
@@ -134,8 +179,8 @@ export default function FindJobs() {
               <div className="text-xs text-slate-500">India-focused software roles</div>
             </div>
             <Button
-              loading={apifyMut.isPending}
-              disabled={!apifySearch.query.trim() || !apifySearch.location.trim()}
+              loading={apifyMut.isPending || isApifyPolling}
+              disabled={isApifyPolling || !apifySearch.query.trim() || !apifySearch.location.trim()}
               onClick={() => { setImportMsg(null); apifyMut.mutate(apifySearch) }}
             >
               Import
@@ -146,15 +191,20 @@ export default function FindJobs() {
               label="Search Query"
               value={apifySearch.query}
               onChange={(e) => setApifySearch((search) => ({ ...search, query: e.target.value }))}
-              disabled={apifyMut.isPending}
+              disabled={apifyMut.isPending || isApifyPolling}
             />
             <Input
               label="Location"
               value={apifySearch.location}
               onChange={(e) => setApifySearch((search) => ({ ...search, location: e.target.value }))}
-              disabled={apifyMut.isPending}
+              disabled={apifyMut.isPending || isApifyPolling}
             />
           </div>
+          {isApifyPolling && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Scraping in progress... this may take a few minutes
+            </div>
+          )}
         </div>
       </Card>
 
@@ -235,4 +285,18 @@ export default function FindJobs() {
       </Card>
     </div>
   )
+}
+
+function getApifyImportSummary(workflowRun) {
+  const sourceResult = workflowRun.state?.source_results?.find((result) => result.source_name === 'apify') ?? {}
+  return {
+    jobs_fetched: Number(sourceResult.jobs_fetched ?? 0),
+    jobs_stored: Number(sourceResult.jobs_stored ?? 0),
+  }
+}
+
+function getWorkflowErrorMessage(workflowRun) {
+  const sourceError = workflowRun.state?.source_results?.find((result) => result.error_message)?.error_message
+  const workflowError = workflowRun.errors?.[0]?.message
+  return sourceError || workflowError || 'Check the workflow run for details.'
 }
