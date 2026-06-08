@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     database_url: str = Field(..., alias="DATABASE_URL")
     gemini_api_key: str = Field(..., alias="GEMINI_API_KEY")
+    apify_api_token: str | None = Field(default=None, alias="APIFY_API_TOKEN")
     gemini_embedding_model: str = Field(
         default="gemini-embedding-2",
         alias="GEMINI_EMBEDDING_MODEL",

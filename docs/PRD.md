@@ -23,7 +23,7 @@ The platform will:
 * Track application progress.
 * Operate entirely on Google Cloud Platform.
 
-The platform is not a job scraper, outreach tool, or auto-apply system.
+The platform is not an outreach tool or auto-apply system.
 
 ---
 
@@ -40,10 +40,7 @@ The platform is not a job scraper, outreach tool, or auto-apply system.
 
 * Collect jobs from approved public sources:
 
-  * Greenhouse
-  * Lever
-  * Remotive
-  * Arbeitnow
+  * Apify-driven LinkedIn/Indeed integrations
 * Normalize and store job data.
 * Maintain source execution logs.
 
@@ -147,11 +144,9 @@ The platform must not:
 
 * Auto-apply to jobs.
 * Send automated emails or outreach.
-* Scrape LinkedIn, Indeed, Naukri, or Glassdoor.
 * Access login-protected systems.
 * Bypass CAPTCHA or robots.txt restrictions.
 * Store private ATS data.
-* Depend on paid job APIs.
 * Become a generic scraping platform.
 
 ---
@@ -162,10 +157,7 @@ The MVP includes:
 
 * Resume upload and parsing
 * Candidate profile extraction
-* Greenhouse integration
-* Lever integration
-* Remotive integration
-* Arbeitnow integration
+* Apify-driven LinkedIn/Indeed integrations
 * PostgreSQL storage with pgvector
 * Gemini embeddings
 * Gemini requirement extraction

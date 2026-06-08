@@ -34,7 +34,7 @@ htmlcov/
 reports/
 test-results/
 
-# Local environment and secrets
+# Local environment and secrets; keep shareable examples tracked.
 .env
 .env.*
 !.env.example
