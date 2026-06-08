@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 from uuid import uuid4
 
@@ -11,7 +12,7 @@ from backend.config import Settings, get_settings
 from backend.database import get_db
 from backend.main import app
 from backend.models import db_models
-from backend.routes import source_routes
+from backend.routes import profile_routes, source_routes
 from backend.sources.base_source import SourceFetchResult, SourceStatus
 
 
@@ -67,6 +68,8 @@ class FakeSession:
         statement_text = str(statement)
         if "source_runs" in statement_text:
             values = list(self.entities.get(db_models.SourceRun, {}).values())
+        elif "job_scores" in statement_text:
+            values = list(self.entities.get(db_models.JobScore, {}).values())
         elif "applications" in statement_text:
             values = list(self.entities.get(db_models.Application, {}).values())
         elif "workflow_runs" in statement_text:
@@ -117,6 +120,35 @@ class FakeSessionFactory:
 
     def __call__(self) -> FakeSessionContext:
         return FakeSessionContext(self._session)
+
+
+class FakeScoreSession(FakeSession):
+    def __init__(self, *, profile_id: Any, jobs: list[Any]) -> None:
+        super().__init__()
+        self.profile = SimpleNamespace(
+            id=profile_id,
+            created_at=datetime.now(UTC),
+            skills={"languages": ["Python"], "frontend": ["React"]},
+        )
+        self.jobs = jobs
+
+    def execute(self, statement: Any) -> FakeResult:
+        statement_text = str(statement)
+        scored_job_ids = {
+            score.job_id
+            for score in self.entities.get(db_models.JobScore, {}).values()
+        }
+        unscored_jobs = [job for job in self.jobs if job.id not in scored_job_ids]
+
+        if "candidate_profiles" in statement_text:
+            return FakeResult([self.profile])
+        if "count" in statement_text.lower() and "job_scores" in statement_text and "jobs" in statement_text:
+            return FakeResult([], scalar=len(unscored_jobs))
+        if "count" in statement_text.lower() and "job_scores" in statement_text:
+            return FakeResult([], scalar=len(scored_job_ids))
+        if "jobs" in statement_text:
+            return FakeResult(unscored_jobs[:2])
+        return FakeResult([])
 
 
 def teardown_function() -> None:
@@ -262,6 +294,51 @@ def test_workflow_run_can_be_read_by_run_id() -> None:
 
     assert response.status_code == 200
     assert response.json()["run_id"] == "apify-test-run"
+
+
+def test_score_jobs_respects_batch_limit_and_returns_remaining_count(monkeypatch: Any) -> None:
+    profile_id = uuid4()
+    jobs = [
+        SimpleNamespace(id=uuid4(), title=f"Job {index}", description="Python and React")
+        for index in range(3)
+    ]
+    session = FakeScoreSession(profile_id=profile_id, jobs=jobs)
+
+    class FakeScore:
+        def __init__(self, job_id: Any) -> None:
+            self._job_id = job_id
+
+        def model_dump(self, *, mode: str) -> dict[str, Any]:
+            return {
+                "job_id": self._job_id,
+                "candidate_profile_id": profile_id,
+                "final_score": 80,
+                "role_match_score": 10,
+                "skill_match_score": 20,
+                "semantic_similarity_score": 0,
+                "experience_fit_score": 10,
+                "freshness_score": 10,
+                "location_fit_score": 10,
+                "source_reliability_score": 20,
+                "matched_skills": ["Python"],
+                "missing_skills": [],
+                "risk_flags": [],
+                "explanation": "Good fit.",
+            }
+
+    class FakeFitScoringService:
+        def score_job(self, *, job: Any, candidate_profile: Any, requirements: Any) -> Any:
+            return SimpleNamespace(score=FakeScore(job.id))
+
+    monkeypatch.setattr(profile_routes, "FitScoringService", FakeFitScoringService)
+
+    response = profile_routes.score_jobs(limit=2, db=session)
+
+    assert response["scored_count"] == 2
+    assert response["scored"] == 2
+    assert response["remaining_unscored_count"] == 1
+    assert response["total_scored"] == 2
+    assert len(session.entities[db_models.JobScore]) == 2
 
 
 def test_health_readiness_checks_database_and_gemini_config() -> None:

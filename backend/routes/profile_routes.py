@@ -4,8 +4,8 @@ import re
 from dataclasses import dataclass, field
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Response
-from sqlalchemy import delete, select
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
@@ -40,28 +40,40 @@ def update_profile(profile_id: UUID, payload: dict[str, object] = Body(...), db:
 
 
 @router.post("/score-jobs", status_code=200)
-def score_jobs(db: Session = Depends(get_db)) -> dict:
+def score_jobs(
+    limit: int = Query(default=10, ge=1, le=50),
+    db: Session = Depends(get_db),
+) -> dict:
     profile = db.execute(
         select(db_models.CandidateProfile).order_by(db_models.CandidateProfile.created_at.desc())
     ).scalar_one_or_none()
     if profile is None:
         raise HTTPException(status_code=422, detail="No candidate profile found. Upload a resume with AI extraction enabled first.")
 
-    already_scored: set = set(
-        db.execute(
-            select(db_models.JobScore.job_id)
-            .where(db_models.JobScore.candidate_profile_id == profile.id)
-        ).scalars().all()
+    scored_job_ids = select(db_models.JobScore.job_id).where(
+        db_models.JobScore.candidate_profile_id == profile.id
     )
+    unscored_jobs = select(db_models.Job).where(db_models.Job.id.not_in(scored_job_ids))
+    remaining_before = db.execute(
+        select(func.count()).select_from(unscored_jobs.subquery())
+    ).scalar_one()
 
     jobs = db.execute(
-        select(db_models.Job)
-        .where(db_models.Job.id.not_in(already_scored) if already_scored else db_models.Job.id.is_not(None))
-        .limit(200)
+        unscored_jobs
+        .order_by(db_models.Job.fetched_at.desc(), db_models.Job.id)
+        .limit(limit)
     ).scalars().all()
 
     if not jobs:
-        return {"scored": 0, "total_scored": len(already_scored), "message": "All jobs already scored."}
+        total_scored = _count_scored_jobs(db, profile.id)
+        return {
+            "scored": 0,
+            "scored_count": 0,
+            "remaining_unscored_count": 0,
+            "total_scored": total_scored,
+            "profile_id": str(profile.id),
+            "message": "All jobs already scored.",
+        }
 
     candidate_skills = _extract_all_skills(profile)
     service = FitScoringService()
@@ -72,8 +84,26 @@ def score_jobs(db: Session = Depends(get_db)) -> dict:
         db.add(db_models.JobScore(**result.score.model_dump(mode="json")))
 
     db.commit()
-    total = len(already_scored) + len(jobs)
-    return {"scored": len(jobs), "total_scored": total, "profile_id": str(profile.id)}
+    scored_count = len(jobs)
+    remaining_unscored_count = max(int(remaining_before) - scored_count, 0)
+    total_scored = _count_scored_jobs(db, profile.id)
+    return {
+        "scored": scored_count,
+        "scored_count": scored_count,
+        "remaining_unscored_count": remaining_unscored_count,
+        "total_scored": total_scored,
+        "profile_id": str(profile.id),
+    }
+
+
+def _count_scored_jobs(db: Session, profile_id: UUID) -> int:
+    return int(
+        db.execute(
+            select(func.count()).select_from(db_models.JobScore).where(
+                db_models.JobScore.candidate_profile_id == profile_id
+            )
+        ).scalar_one()
+    )
 
 
 @dataclass

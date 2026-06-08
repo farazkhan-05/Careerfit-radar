@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, ChevronUp, Plus, Sparkles, Zap } from 'lucide-react'
 import { importApify, listSourceRuns } from '../api/sources'
@@ -16,6 +16,7 @@ import { PageSpinner } from '../components/ui/Spinner'
 
 const SOURCE_COLORS = { apify: 'teal' }
 const TERMINAL_WORKFLOW_STATUSES = new Set(['completed', 'completed_with_errors', 'failed'])
+const SCORE_BATCH_LIMIT = 10
 
 function RunsTable({ runs }) {
   if (runs.length === 0) {
@@ -62,6 +63,9 @@ export default function FindJobs() {
   const [manualForm, setManualForm] = useState({ company_name: '', title: '', apply_url: '', location: '', remote_type: '', description: '' })
   const [apifySearch, setApifySearch] = useState({ query: 'Front End Developer', location: 'Lucknow, India' })
   const [activeImportRunId, setActiveImportRunId] = useState(null)
+  const [scoreProgress, setScoreProgress] = useState({ isRunning: false, remaining: null, scored: 0 })
+  const mountedRef = useRef(false)
+  const scoreRunRef = useRef(0)
 
   const [importMsg, setImportMsg] = useState(null)
   const [scoreMsg, setScoreMsg] = useState(null)
@@ -81,6 +85,14 @@ export default function FindJobs() {
   })
   const profile = profilesQ.data?.items?.[0]
   const isApifyPolling = Boolean(activeImportRunId)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      scoreRunRef.current += 1
+    }
+  }, [])
 
   const onImportSuccess = useCallback((data, name) => {
     queryClient.invalidateQueries({ queryKey: ['sourceRuns'] })
@@ -129,18 +141,52 @@ export default function FindJobs() {
     setActiveImportRunId(null)
   }, [activeImportRunId, apifyRunQ.error, apifyRunQ.isError])
 
-  const scoreMut = useMutation({
-    mutationFn: scoreJobs,
-    onSuccess: (data) => {
+  const scoreMut = useMutation({ mutationFn: scoreJobs })
+  const isScoring = scoreProgress.isRunning || scoreMut.isPending
+
+  async function scoreAllJobBatches() {
+    const runToken = scoreRunRef.current + 1
+    scoreRunRef.current = runToken
+    let totalScored = 0
+    let remaining = null
+
+    setScoreMsg(null)
+    setScoreProgress({ isRunning: true, remaining: null, scored: 0 })
+
+    try {
+      do {
+        const data = await scoreMut.mutateAsync({ limit: SCORE_BATCH_LIMIT })
+        if (!mountedRef.current || scoreRunRef.current !== runToken) {
+          return
+        }
+
+        const batchScored = Number(data.scored_count ?? data.scored ?? 0)
+        remaining = Number(data.remaining_unscored_count ?? 0)
+        totalScored += batchScored
+        setScoreProgress({ isRunning: remaining > 0, remaining, scored: totalScored })
+      } while (remaining > 0)
+
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
-      if (data.scored === 0) {
-        setScoreMsg({ type: 'success', message: `All ${data.total_scored} jobs already scored. Go to Job Matches to see results.` })
+      if (totalScored === 0) {
+        setScoreMsg({ type: 'success', message: 'All jobs already scored. Go to Job Matches to see results.' })
       } else {
-        setScoreMsg({ type: 'success', message: `Scored ${data.scored} jobs against your profile. Go to Job Matches to see results sorted by fit.` })
+        setScoreMsg({ type: 'success', message: `Scored ${totalScored} jobs against your profile. Go to Job Matches to see results sorted by fit.` })
       }
-    },
-    onError: (err) => setScoreMsg({ type: 'error', message: err.message }),
-  })
+    } catch (err) {
+      if (!mountedRef.current || scoreRunRef.current !== runToken) {
+        return
+      }
+      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      setScoreMsg({
+        type: 'error',
+        message: `Scoring paused after ${totalScored} job${totalScored !== 1 ? 's' : ''}: ${err.message}`,
+      })
+    } finally {
+      if (mountedRef.current && scoreRunRef.current === runToken) {
+        setScoreProgress((progress) => ({ ...progress, isRunning: false }))
+      }
+    }
+  }
 
   const manualMut = useMutation({
     mutationFn: () => createManualJob({ ...manualForm, source: 'manual', source_job_id: `manual-${Date.now()}`, remote_type: manualForm.remote_type || null, location: manualForm.location || null }),
@@ -228,13 +274,17 @@ export default function FindJobs() {
             </p>
           </div>
           <Button
-            onClick={() => { setScoreMsg(null); scoreMut.mutate() }}
-            loading={scoreMut.isPending}
-            disabled={!profile}
+            onClick={scoreAllJobBatches}
+            loading={isScoring}
+            disabled={!profile || isScoring}
             className="flex-shrink-0"
           >
             <Sparkles className="h-4 w-4" />
-            Score Jobs
+            {isScoring && scoreProgress.remaining !== null
+              ? `Scoring batch... ${scoreProgress.remaining} remaining`
+              : isScoring
+                ? 'Scoring batch...'
+                : 'Score Jobs'}
           </Button>
         </div>
         {scoreMsg?.type === 'success' && <SuccessMessage message={scoreMsg.message} className="mt-3" />}
