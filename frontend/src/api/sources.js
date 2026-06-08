@@ -1,7 +1,11 @@
 import apiClient from './client'
 
-export async function importApify() {
-  const { data } = await apiClient.post('/sources/import/apify')
+export async function importApify({ query, location } = {}) {
+  const payload = {
+    query: typeof query === 'string' ? query.trim() : undefined,
+    location: typeof location === 'string' ? location.trim() : undefined,
+  }
+  const { data } = await apiClient.post('/sources/import/apify', payload)
   return data
 }
 

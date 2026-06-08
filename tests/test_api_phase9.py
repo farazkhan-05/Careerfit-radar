@@ -11,6 +11,8 @@ from backend.config import Settings, get_settings
 from backend.database import get_db
 from backend.main import app
 from backend.models import db_models
+from backend.routes import source_routes
+from backend.sources.base_source import SourceFetchResult, SourceStatus
 
 
 class FakeScalarResult:
@@ -172,6 +174,44 @@ def test_csv_export_returns_jobs_csv() -> None:
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/csv")
     assert "Backend Engineer" in response.text
+
+
+def test_apify_import_route_passes_dynamic_search_payload(monkeypatch: Any) -> None:
+    session = FakeSession()
+    client = _client_with_session(session)
+    captured: dict[str, Any] = {}
+
+    class FakeApifySource:
+        source_name = "apify"
+
+        def fetch_jobs(self, *, query: str | None = None, location: str | None = None) -> SourceFetchResult:
+            captured["query"] = query
+            captured["location"] = location
+            return SourceFetchResult(
+                source_name=self.source_name,
+                status=SourceStatus.SUCCESS,
+                started_at=datetime.now(UTC),
+                completed_at=datetime.now(UTC),
+                jobs=[],
+            )
+
+        def close(self) -> None:
+            captured["closed"] = True
+
+    monkeypatch.setattr(source_routes, "ApifySource", FakeApifySource)
+
+    response = client.post(
+        "/sources/import/apify",
+        json={"query": "React Engineer", "location": "Bengaluru, India"},
+    )
+
+    assert response.status_code == 200
+    assert captured == {
+        "query": "React Engineer",
+        "location": "Bengaluru, India",
+        "closed": True,
+    }
+    assert response.json()["source_name"] == "apify"
 
 
 def test_health_readiness_checks_database_and_gemini_config() -> None:

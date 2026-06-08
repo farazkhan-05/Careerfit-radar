@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.models import db_models
-from backend.models.api_schemas import PageResponse, SourceImportResponse
+from backend.models.api_schemas import ApifyImportRequest, PageResponse, SourceImportResponse
 from backend.models.schemas import SourceRunCreate, SourceRunRead
 from backend.routes.crud import PaginationParams, create_entity, delete_entity, get_or_404, paginate, update_entity
 from backend.sources.apify_source import ApifySource
@@ -18,10 +18,14 @@ router = APIRouter(prefix="/sources", tags=["sources"])
 
 
 @router.post("/import/apify", response_model=SourceImportResponse)
-def import_apify_jobs(db: Session = Depends(get_db)) -> SourceImportResponse:
+def import_apify_jobs(
+    payload: ApifyImportRequest | None = Body(default=None),
+    db: Session = Depends(get_db),
+) -> SourceImportResponse:
+    search = payload or ApifyImportRequest()
     source = ApifySource()
     try:
-        result = source.fetch_jobs()
+        result = source.fetch_jobs(query=search.query, location=search.location)
     finally:
         source.close()
     return _store_source_result(db, result.source_name, result.status.value, result.jobs, result.error_message)

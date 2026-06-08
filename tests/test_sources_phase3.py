@@ -126,12 +126,9 @@ def test_apify_builds_india_full_time_search_payload() -> None:
     assert result.status == SourceStatus.SUCCESS
     run_input = fake_client.actor_client.run_input
     assert run_input is not None
-    searches = run_input["searchTerms"]
-    assert {"Associate Software Engineer", "Front End Developer"} == {
-        search for search in searches
-    }
+    assert run_input["searchTerms"] == ["Front End Developer"]
     assert run_input["sites"] == ["linkedin", "indeed"]
-    assert run_input["location"] == "Lucknow, Uttar Pradesh, India"
+    assert run_input["location"] == "Lucknow, India"
     assert run_input["countryIndeed"] == "india"
     assert run_input["jobType"] == "fulltime"
     assert run_input["distance"] == 50
@@ -139,6 +136,19 @@ def test_apify_builds_india_full_time_search_payload() -> None:
     assert fake_client.actor_client.call_kwargs["wait_duration"].total_seconds() == 120
     assert fake_client.dataset_client.iterate_kwargs["clean"] is True
     assert fake_client.dataset_client.iterate_kwargs["limit"] == 50
+
+
+def test_apify_accepts_dynamic_search_payload() -> None:
+    fake_client = FakeApifyClient([])
+    source = ApifySource(api_token="test-token", apify_client=fake_client)
+
+    result = source.fetch_jobs(query="React Engineer", location="Bengaluru, India")
+
+    assert result.status == SourceStatus.SUCCESS
+    run_input = fake_client.actor_client.run_input
+    assert run_input is not None
+    assert run_input["searchTerms"] == ["React Engineer"]
+    assert run_input["location"] == "Bengaluru, India"
 
 
 def test_apify_missing_token_is_handled_safely() -> None:

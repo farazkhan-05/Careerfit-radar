@@ -58,6 +58,7 @@ export default function FindJobs() {
 
   const [showManual, setShowManual] = useState(false)
   const [manualForm, setManualForm] = useState({ company_name: '', title: '', apply_url: '', location: '', remote_type: '', description: '' })
+  const [apifySearch, setApifySearch] = useState({ query: 'Front End Developer', location: 'Lucknow, India' })
 
   const [importMsg, setImportMsg] = useState(null)
   const [scoreMsg, setScoreMsg] = useState(null)
@@ -124,19 +125,36 @@ export default function FindJobs() {
       {importMsg?.type === 'error' && <ErrorMessage message={importMsg.message} className="mb-4" />}
 
       <Card className="mb-6">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <div className="text-sm font-semibold text-slate-800">
-              Apify <span className="text-xs font-normal text-emerald-600 ml-1">LinkedIn/Indeed</span>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-slate-800">
+                Apify <span className="text-xs font-normal text-emerald-600 ml-1">LinkedIn/Indeed</span>
+              </div>
+              <div className="text-xs text-slate-500">India-focused software roles</div>
             </div>
-            <div className="text-xs text-slate-500">India-focused software roles</div>
+            <Button
+              loading={apifyMut.isPending}
+              disabled={!apifySearch.query.trim() || !apifySearch.location.trim()}
+              onClick={() => { setImportMsg(null); apifyMut.mutate(apifySearch) }}
+            >
+              Import
+            </Button>
           </div>
-          <Button
-            loading={apifyMut.isPending}
-            onClick={() => { setImportMsg(null); apifyMut.mutate() }}
-          >
-            Import
-          </Button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="Search Query"
+              value={apifySearch.query}
+              onChange={(e) => setApifySearch((search) => ({ ...search, query: e.target.value }))}
+              disabled={apifyMut.isPending}
+            />
+            <Input
+              label="Location"
+              value={apifySearch.location}
+              onChange={(e) => setApifySearch((search) => ({ ...search, location: e.target.value }))}
+              disabled={apifyMut.isPending}
+            />
+          </div>
         </div>
       </Card>
 

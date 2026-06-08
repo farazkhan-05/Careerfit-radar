@@ -48,6 +48,8 @@ class ApifyActorConfig:
 class ApifySource(JobSource):
     source_name = "apify"
     timeout_seconds = 120.0
+    default_query = "Front End Developer"
+    default_location = "Lucknow, India"
 
     def __init__(
         self,
@@ -59,6 +61,8 @@ class ApifySource(JobSource):
     ) -> None:
         super().__init__(**kwargs)
         self._actor_config = actor_config or ApifyActorConfig()
+        self._search_query = self.default_query
+        self._search_location = self.default_location
         self._configuration_error: str | None = None
 
         token = api_token if api_token is not None else get_settings().apify_api_token
@@ -71,7 +75,9 @@ class ApifySource(JobSource):
             return
         self._apify_client = ApifyClient(token.strip())
 
-    def fetch_jobs(self) -> SourceFetchResult:
+    def fetch_jobs(self, *, query: str | None = None, location: str | None = None) -> SourceFetchResult:
+        self._search_query = _normalize_search_text(query, self.default_query)
+        self._search_location = _normalize_search_text(location, self.default_location)
         if self._configuration_error is not None:
             started_at = datetime.now(UTC)
             return SourceFetchResult(
@@ -141,8 +147,8 @@ class ApifySource(JobSource):
 
     def _build_run_input(self) -> dict[str, Any]:
         return {
-            "searchTerms": ["Associate Software Engineer", "Front End Developer"],
-            "location": "Lucknow, Uttar Pradesh, India",
+            "searchTerms": [self._search_query],
+            "location": self._search_location,
             "sites": ["linkedin", "indeed"],
             "maxResults": self._actor_config.max_items,
             "jobType": "fulltime",
@@ -258,3 +264,10 @@ def _source_job_id(payload: Mapping[str, Any], apply_url: str, title: str, compa
         return as_text(raw_id)[:255]
     digest = sha256(f"{apply_url}|{title}|{company_name}".encode("utf-8")).hexdigest()
     return digest[:64]
+
+
+def _normalize_search_text(value: str | None, default: str) -> str:
+    if value is None:
+        return default
+    normalized = value.strip()
+    return normalized or default

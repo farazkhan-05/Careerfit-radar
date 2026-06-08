@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class PageResponse(BaseModel):
@@ -34,6 +34,19 @@ class ManualJobCreate(BaseModel):
     remote_type: str | None = Field(default=None, max_length=80)
     apply_url: str = Field(min_length=1, max_length=1000)
     description: str = Field(min_length=1)
+
+
+class ApifyImportRequest(BaseModel):
+    query: str = Field(default="Front End Developer", min_length=1, max_length=255)
+    location: str = Field(default="Lucknow, India", min_length=1, max_length=255)
+
+    @field_validator("query", "location")
+    @classmethod
+    def normalize_required_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Value must not be blank.")
+        return normalized
 
 
 class SourceImportResponse(BaseModel):
