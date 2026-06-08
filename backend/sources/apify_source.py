@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from typing import Any, Mapping, Protocol
 
@@ -102,7 +102,7 @@ class ApifySource(JobSource):
         run_input = self._build_run_input()
         run = self._apify_client.actor(self._actor_config.actor_id).call(
             run_input=run_input,
-            wait_secs=self._actor_config.wait_secs,
+            wait_duration=timedelta(seconds=self._actor_config.wait_secs),
         )
         dataset_id = _get_value(run, "defaultDatasetId", "default_dataset_id")
         if not dataset_id:

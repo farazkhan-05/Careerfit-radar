@@ -136,7 +136,7 @@ def test_apify_builds_india_full_time_search_payload() -> None:
     assert run_input["jobType"] == "fulltime"
     assert run_input["distance"] == 50
     assert fake_client.actor_client.actor_id == "openclawai/job-board-scraper"
-    assert fake_client.actor_client.call_kwargs["wait_secs"] == 120
+    assert fake_client.actor_client.call_kwargs["wait_duration"].total_seconds() == 120
     assert fake_client.dataset_client.iterate_kwargs["clean"] is True
     assert fake_client.dataset_client.iterate_kwargs["limit"] == 50
 
