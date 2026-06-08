@@ -1,8 +1,8 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Upload, FileText, Trash2, User, Sparkles } from 'lucide-react'
-import { listResumes, uploadResume, deleteResume } from '../api/resumes'
-import { listProfiles } from '../api/profiles'
+import { listResumes, uploadResume, deleteResume, deleteAllResumes } from '../api/resumes'
+import { listProfiles, deleteProfile, deleteAllProfiles } from '../api/profiles'
 import { Card, CardHeader } from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { PageSpinner } from '../components/ui/Spinner'
@@ -194,6 +194,26 @@ export default function Resume() {
     },
   })
 
+  const deleteAllResumesMut = useMutation({
+    mutationFn: deleteAllResumes,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['resumes'] })
+      queryClient.invalidateQueries({ queryKey: ['profiles'] })
+      setUploadStatus({ type: 'success', message: 'All resumes and profiles deleted.' })
+    },
+    onError: (err) => setUploadStatus({ type: 'error', message: err.message }),
+  })
+
+  const deleteProfileMut = useMutation({
+    mutationFn: (id) => deleteProfile(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['profiles'] }),
+  })
+
+  const deleteAllProfilesMut = useMutation({
+    mutationFn: deleteAllProfiles,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['profiles'] }),
+  })
+
   const resumes = resumesQ.data?.items ?? []
   const profiles = profilesQ.data?.items ?? []
 
@@ -226,7 +246,28 @@ export default function Resume() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Uploaded resumes */}
           <Card>
-            <CardHeader title="Uploaded Resumes" subtitle={`${resumes.length} file${resumes.length !== 1 ? 's' : ''}`} />
+            <CardHeader
+              title="Uploaded Resumes"
+              subtitle={`${resumes.length} file${resumes.length !== 1 ? 's' : ''}`}
+              action={
+                resumes.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    loading={deleteAllResumesMut.isPending}
+                    onClick={() => {
+                      if (window.confirm('Delete all resumes and profiles? This cannot be undone.')) {
+                        deleteAllResumesMut.mutate()
+                      }
+                    }}
+                    className="text-rose-500 hover:text-rose-600 hover:bg-rose-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" />
+                    Delete All
+                  </Button>
+                )
+              }
+            />
             {resumesQ.isLoading ? (
               <PageSpinner />
             ) : resumes.length === 0 ? (
@@ -253,8 +294,26 @@ export default function Resume() {
               title="Candidate Profile"
               subtitle="Extracted by AI from your resume"
               action={
-                <div className="h-7 w-7 rounded-full bg-amber-100 flex items-center justify-center">
-                  <User className="h-4 w-4 text-amber-600" />
+                <div className="flex items-center gap-2">
+                  {profiles.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      loading={deleteAllProfilesMut.isPending}
+                      onClick={() => {
+                        if (window.confirm('Delete all extracted profiles?')) {
+                          deleteAllProfilesMut.mutate()
+                        }
+                      }}
+                      className="text-rose-500 hover:text-rose-600 hover:bg-rose-50"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1" />
+                      Delete All
+                    </Button>
+                  )}
+                  <div className="h-7 w-7 rounded-full bg-amber-100 flex items-center justify-center">
+                    <User className="h-4 w-4 text-amber-600" />
+                  </div>
                 </div>
               }
             />
@@ -267,7 +326,21 @@ export default function Resume() {
                 description="Upload a resume with AI extraction enabled."
               />
             ) : (
-              <ProfileCard profile={profiles[0]} />
+              <div className="space-y-4">
+                {profiles.map((p) => (
+                  <div key={p.id} className="relative">
+                    <button
+                      onClick={() => deleteProfileMut.mutate(p.id)}
+                      disabled={deleteProfileMut.isPending && deleteProfileMut.variables === p.id}
+                      className="absolute top-0 right-0 p-1 text-rose-400 hover:text-rose-600 transition-colors"
+                      title="Delete profile"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                    <ProfileCard profile={p} />
+                  </div>
+                ))}
+              </div>
             )}
           </Card>
         </div>

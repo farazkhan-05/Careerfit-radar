@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ClipboardList, Pencil, Trash2 } from 'lucide-react'
-import { listApplications, updateApplication, deleteApplication } from '../api/applications'
+import { Pencil, Trash2 } from 'lucide-react'
+import { listApplications, updateApplication, deleteApplication, deleteAllApplications } from '../api/applications'
 import { Card } from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { Select, Textarea } from '../components/ui/Input'
@@ -134,6 +134,15 @@ export default function Applications() {
     onError: (err) => setDeleteMsg({ type: 'error', message: err.message }),
   })
 
+  const deleteAllMut = useMutation({
+    mutationFn: deleteAllApplications,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['applications'] })
+      setDeleteMsg({ type: 'success', message: 'All applications deleted.' })
+    },
+    onError: (err) => setDeleteMsg({ type: 'error', message: err.message }),
+  })
+
   const applications = appsQ.data?.items ?? []
   const total = appsQ.data?.total ?? 0
 
@@ -144,9 +153,27 @@ export default function Applications() {
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Applications</h1>
-        <p className="text-slate-500 mt-1">Track your job applications and follow-ups</p>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Applications</h1>
+          <p className="text-slate-500 mt-1">Track your job applications and follow-ups</p>
+        </div>
+        {total > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            loading={deleteAllMut.isPending}
+            onClick={() => {
+              if (window.confirm(`Delete all ${total} applications? This cannot be undone.`)) {
+                deleteAllMut.mutate()
+              }
+            }}
+            className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 mt-1"
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1" />
+            Delete All
+          </Button>
+        )}
       </div>
 
       {deleteMsg?.type === 'success' && <SuccessMessage message={deleteMsg.message} className="mb-4" />}

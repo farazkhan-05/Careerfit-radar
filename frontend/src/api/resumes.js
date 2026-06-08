@@ -4,9 +4,7 @@ export async function uploadResume(file, extractProfile = true) {
   const form = new FormData()
   form.append('file', file)
   form.append('extract_profile', String(extractProfile))
-  const { data } = await apiClient.post('/resumes/upload', form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
+  const { data } = await apiClient.post('/resumes/upload', form)
   return data
 }
 
@@ -22,4 +20,8 @@ export async function getResume(resumeId) {
 
 export async function deleteResume(resumeId) {
   await apiClient.delete(`/resumes/${resumeId}`)
+}
+
+export async function deleteAllResumes() {
+  await apiClient.delete('/resumes')
 }

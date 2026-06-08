@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Search, ExternalLink, BookmarkPlus, SlidersHorizontal } from 'lucide-react'
-import { listJobs } from '../api/jobs'
+import { ExternalLink, BookmarkPlus, SlidersHorizontal, Trash2, Zap } from 'lucide-react'
+import { listJobs, deleteJob, deleteAllJobs } from '../api/jobs'
 import { saveJob } from '../api/applications'
 import { Card } from '../components/ui/Card'
 import Button from '../components/ui/Button'
@@ -14,8 +14,19 @@ import { Link } from 'react-router-dom'
 
 const PAGE_SIZE = 25
 
-function JobCard({ job, onSave, saving }) {
+function MatchScoreBadge({ score }) {
+  if (score == null) return null
+  const color = score >= 70 ? 'bg-emerald-100 text-emerald-700' : score >= 50 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${color}`}>
+      ⚡ {score}% match
+    </span>
+  )
+}
+
+function JobCard({ job, onSave, saving, onDelete, deleting }) {
   const [saved, setSaved] = useState(false)
+  const [showExplanation, setShowExplanation] = useState(false)
 
   async function handleSave() {
     await onSave(job.id)
@@ -25,20 +36,32 @@ function JobCard({ job, onSave, saving }) {
   return (
     <Card className="hover:shadow-md transition-shadow duration-150">
       <div className="flex items-start gap-4">
-        {/* Left accent */}
-        <div className="h-10 w-1 rounded-full bg-gradient-to-b from-brand-400 to-indigo-400 flex-shrink-0 mt-1" />
+        <div className={`h-10 w-1 rounded-full flex-shrink-0 mt-1 ${
+          job.match_score >= 70 ? 'bg-gradient-to-b from-emerald-400 to-teal-400'
+          : job.match_score >= 50 ? 'bg-gradient-to-b from-amber-400 to-orange-400'
+          : 'bg-gradient-to-b from-brand-400 to-indigo-400'
+        }`} />
 
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 mb-2">
             <h3 className="text-sm font-semibold text-slate-900 leading-snug">{job.title}</h3>
-            <StatusBadge status={job.status} />
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <MatchScoreBadge score={job.match_score} />
+              <StatusBadge status={job.status} />
+              <button
+                onClick={() => onDelete(job.id)}
+                disabled={deleting}
+                className="p-1 text-slate-300 hover:text-rose-500 transition-colors"
+                title="Delete job"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 mb-3">
             <SourceBadge source={job.source} />
-            {job.location && (
-              <span className="text-xs text-slate-500">📍 {job.location}</span>
-            )}
+            {job.location && <span className="text-xs text-slate-500">📍 {job.location}</span>}
             {job.remote_type && (
               <span className="text-xs text-slate-500 capitalize">
                 {job.remote_type === 'remote' ? '🌍' : job.remote_type === 'hybrid' ? '🔀' : '🏢'} {job.remote_type}
@@ -55,25 +78,24 @@ function JobCard({ job, onSave, saving }) {
             <p className="text-xs text-slate-500 line-clamp-2 mb-3">{job.description}</p>
           )}
 
+          {job.match_explanation && (
+            <div className="mb-3">
+              <button onClick={() => setShowExplanation(v => !v)} className="text-xs text-brand-600 hover:text-brand-700 underline-offset-2 hover:underline">
+                {showExplanation ? 'Hide' : 'Why this score?'}
+              </button>
+              {showExplanation && (
+                <p className="mt-1.5 text-xs text-slate-500 bg-slate-50 rounded-lg p-2.5">{job.match_explanation}</p>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center gap-2">
-            <Button
-              variant={saved ? 'success' : 'secondary'}
-              size="sm"
-              loading={saving}
-              disabled={saved || job.status === 'saved'}
-              onClick={handleSave}
-            >
+            <Button variant={saved ? 'success' : 'secondary'} size="sm" loading={saving} disabled={saved || job.status === 'saved'} onClick={handleSave}>
               <BookmarkPlus className="h-3.5 w-3.5" />
               {saved || job.status === 'saved' ? 'Saved' : 'Save'}
             </Button>
-            <a
-              href={job.apply_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-600 hover:bg-brand-700 text-white transition-colors"
-            >
-              Apply
-              <ExternalLink className="h-3 w-3" />
+            <a href={job.apply_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-600 hover:bg-brand-700 text-white transition-colors">
+              Apply <ExternalLink className="h-3 w-3" />
             </a>
           </div>
         </div>
@@ -87,10 +109,11 @@ export default function Jobs() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [source, setSource] = useState('')
+  const [topMatches, setTopMatches] = useState(false)
   const [offset, setOffset] = useState(0)
   const [saveMsg, setSaveMsg] = useState(null)
 
-  const params = { limit: PAGE_SIZE, offset, q: search || undefined, status: status || undefined, source: source || undefined }
+  const params = { limit: PAGE_SIZE, offset, q: search || undefined, status: status || undefined, source: source || undefined, top_matches: topMatches || undefined }
 
   const jobsQ = useQuery({
     queryKey: ['jobs', params],
@@ -107,6 +130,24 @@ export default function Jobs() {
     onError: (err) => setSaveMsg({ type: 'error', message: err.message }),
   })
 
+  const deleteMut = useMutation({
+    mutationFn: (jobId) => deleteJob(jobId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['jobs'] }),
+    onError: (err) => setSaveMsg({ type: 'error', message: err.message }),
+  })
+
+  const deleteAllMut = useMutation({
+    mutationFn: deleteAllJobs,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      queryClient.invalidateQueries({ queryKey: ['sourceRuns'] })
+      queryClient.invalidateQueries({ queryKey: ['workflows'] })
+      queryClient.invalidateQueries({ queryKey: ['applications'] })
+      setSaveMsg({ type: 'success', message: 'All jobs deleted.' })
+    },
+    onError: (err) => setSaveMsg({ type: 'error', message: err.message }),
+  })
+
   const jobs = jobsQ.data?.items ?? []
   const total = jobsQ.data?.total ?? 0
   const totalPages = Math.ceil(total / PAGE_SIZE)
@@ -119,9 +160,27 @@ export default function Jobs() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Job Matches</h1>
-        <p className="text-slate-500 mt-1">Browse and save jobs that match your profile</p>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Job Matches</h1>
+          <p className="text-slate-500 mt-1">Browse and save jobs that match your profile</p>
+        </div>
+        {total > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            loading={deleteAllMut.isPending}
+            onClick={() => {
+              if (window.confirm(`Delete all ${total} jobs? This cannot be undone.`)) {
+                deleteAllMut.mutate()
+              }
+            }}
+            className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 mt-1"
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1" />
+            Delete All
+          </Button>
+        )}
       </div>
 
       {saveMsg?.type === 'success' && <SuccessMessage message={saveMsg.message} className="mb-4" />}
@@ -129,46 +188,42 @@ export default function Jobs() {
 
       {/* Filters */}
       <Card className="mb-5">
-        <form onSubmit={handleSearch}>
-          <div className="flex flex-wrap gap-3 items-end">
-            <div className="flex-1 min-w-48">
-              <Input
-                placeholder="Search job titles…"
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setOffset(0) }}
-              />
-            </div>
-            <div className="w-36">
-              <Select
-                value={status}
-                onChange={(e) => { setStatus(e.target.value); setOffset(0) }}
-              >
-                <option value="">All statuses</option>
-                <option value="new">New</option>
-                <option value="saved">Saved</option>
-                <option value="duplicate">Duplicate</option>
-                <option value="rejected">Rejected</option>
-              </Select>
-            </div>
-            <div className="w-36">
-              <Select
-                value={source}
-                onChange={(e) => { setSource(e.target.value); setOffset(0) }}
-              >
-                <option value="">All sources</option>
-                <option value="greenhouse">Greenhouse</option>
-                <option value="lever">Lever</option>
-                <option value="remotive">Remotive</option>
-                <option value="arbeitnow">Arbeitnow</option>
-                <option value="manual">Manual</option>
-              </Select>
-            </div>
-            <Button type="submit" variant="secondary" size="md">
-              <SlidersHorizontal className="h-4 w-4" />
-              Filter
-            </Button>
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-48">
+            <Input
+              placeholder="Search job titles…"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setOffset(0) }}
+            />
           </div>
-        </form>
+          <div className="w-36">
+            <Select value={status} onChange={(e) => { setStatus(e.target.value); setOffset(0) }}>
+              <option value="">All statuses</option>
+              <option value="new">New</option>
+              <option value="saved">Saved</option>
+              <option value="rejected">Rejected</option>
+            </Select>
+          </div>
+          <div className="w-36">
+            <Select value={source} onChange={(e) => { setSource(e.target.value); setOffset(0) }}>
+              <option value="">All sources</option>
+              <option value="remotive">Remotive</option>
+              <option value="arbeitnow">Arbeitnow</option>
+              <option value="greenhouse">Greenhouse</option>
+              <option value="lever">Lever</option>
+              <option value="manual">Manual</option>
+            </Select>
+          </div>
+          <button
+            onClick={() => { setTopMatches(v => !v); setOffset(0) }}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
+              topMatches ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300'
+            }`}
+          >
+            <Zap className="h-3.5 w-3.5" />
+            Top Matches
+          </button>
+        </div>
       </Card>
 
       {/* Count */}
@@ -200,6 +255,8 @@ export default function Jobs() {
               job={job}
               onSave={(id) => saveMut.mutateAsync(id)}
               saving={saveMut.isPending && saveMut.variables === job.id}
+              onDelete={(id) => deleteMut.mutate(id)}
+              deleting={deleteMut.isPending && deleteMut.variables === job.id}
             />
           ))}
         </div>

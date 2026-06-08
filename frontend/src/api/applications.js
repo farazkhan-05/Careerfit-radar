@@ -20,3 +20,7 @@ export async function updateApplication(applicationId, patch) {
 export async function deleteApplication(applicationId) {
   await apiClient.delete(`/applications/${applicationId}`)
 }
+
+export async function deleteAllApplications() {
+  await apiClient.delete('/applications')
+}

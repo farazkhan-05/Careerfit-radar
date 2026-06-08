@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Query
-from sqlalchemy import select
+from fastapi import APIRouter, Body, Depends, Query, Response
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
@@ -52,6 +52,13 @@ def get_application(application_id: UUID, db: Session = Depends(get_db)) -> db_m
 @router.patch("/{application_id}", response_model=ApplicationRead)
 def update_application(application_id: UUID, payload: dict[str, object] = Body(...), db: Session = Depends(get_db)) -> db_models.Application:
     return update_entity(db, db_models.Application, application_id, payload)
+
+
+@router.delete("", status_code=204)
+def delete_all_applications(db: Session = Depends(get_db)):
+    db.execute(delete(db_models.Application))
+    db.commit()
+    return Response(status_code=204)
 
 
 @router.delete("/{application_id}", status_code=204)

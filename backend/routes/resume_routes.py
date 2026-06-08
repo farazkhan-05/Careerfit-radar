@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, UploadFile, status
-from sqlalchemy import select
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Response, UploadFile, status
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from backend.config import get_settings
@@ -124,6 +124,13 @@ def update_resume(
     db: Session = Depends(get_db),
 ) -> db_models.Resume:
     return update_entity(db, db_models.Resume, resume_id, payload)
+
+
+@router.delete("", status_code=204)
+def delete_all_resumes(db: Session = Depends(get_db)):
+    db.execute(delete(db_models.Resume))
+    db.commit()
+    return Response(status_code=204)
 
 
 @router.delete("/{resume_id}", status_code=204)
