@@ -156,3 +156,80 @@ def test_gap_analysis_guidance_handles_strong_match() -> None:
     assert analysis.experience_gap is None
     assert analysis.risk_flags == ()
     assert analysis.application_guidance[0].startswith("Lead with resume-backed")
+
+
+def test_gap_analysis_matches_common_stack_synonyms_and_substrings() -> None:
+    candidate = FakeCandidateProfile(
+        skills={
+            "frontend": ["React", "JavaScript"],
+            "backend": ["Node.js"],
+        },
+        projects=[
+            {
+                "name": "Hiring Dashboard",
+                "technologies": ["React Native", "JS"],
+                "summary": "Built mobile and web UI with React Native and JS.",
+            }
+        ],
+    )
+    requirements = FakeRequirement(
+        required_skills=["React.js", "JS", "NodeJS"],
+        preferred_skills=["ReactJS"],
+        min_experience_years=None,
+    )
+
+    analysis = GapAnalysisService().analyze(
+        candidate_profile=candidate,
+        requirements=requirements,
+    )
+
+    assert {item.skill for item in analysis.matched_required_skills} == {
+        "React.js",
+        "JS",
+        "NodeJS",
+    }
+    assert analysis.missing_required_skills == ()
+    assert analysis.missing_preferred_skills == ()
+    assert analysis.risk_flags == ()
+
+
+def test_gap_analysis_avoids_java_javascript_false_positive() -> None:
+    candidate = FakeCandidateProfile(skills={"technical": ["JavaScript", "Preact"]})
+    requirements = FakeRequirement(
+        required_skills=["Java", "React"],
+        preferred_skills=[],
+        min_experience_years=None,
+    )
+
+    analysis = GapAnalysisService().analyze(
+        candidate_profile=candidate,
+        requirements=requirements,
+    )
+
+    assert analysis.matched_required_skills == ()
+    assert analysis.missing_required_skills == ("Java", "React")
+    assert "missing_required_skills" in analysis.risk_flags
+
+
+def test_gap_analysis_contextualizes_full_time_engineering_roles() -> None:
+    candidate = FakeCandidateProfile(
+        target_roles=["Frontend Software Engineer"],
+        skills={"technical": ["React", "TypeScript"]},
+        experience_years=3,
+    )
+    requirements = FakeRequirement(
+        required_skills=["Full-time Software Engineering", "TypeScript"],
+        preferred_skills=[],
+        min_experience_years=2,
+    )
+
+    analysis = GapAnalysisService().analyze(
+        candidate_profile=candidate,
+        requirements=requirements,
+    )
+
+    matched = {item.skill: item.evidence for item in analysis.matched_required_skills}
+    assert matched["Full-time Software Engineering"].startswith("Resume target role:")
+    assert matched["TypeScript"].startswith("Resume skill:")
+    assert analysis.missing_required_skills == ()
+    assert analysis.experience_gap is None
