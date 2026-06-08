@@ -240,6 +240,7 @@ def _posted_at(payload: Mapping[str, Any]) -> datetime | None:
         "posted_at",
         "publishedAt",
         "published_at",
+        "date_posted",
         "datePosted",
         "postedDate",
         "createdAt",

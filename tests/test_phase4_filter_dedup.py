@@ -117,6 +117,21 @@ def test_hard_filter_rejects_default_senior_keywords() -> None:
     assert decision.filter_name == "excluded_keyword"
 
 
+def test_hard_filter_rejects_senior_react_developer_by_default() -> None:
+    job = FakeJob(
+        title="Senior React Developer",
+        description="Build frontend features with React and TypeScript.",
+    )
+
+    result = HardFilterService(HardFilterConfig()).filter_jobs([job])
+
+    assert result.accepted_jobs == ()
+    assert result.rejected_jobs[0].job_id == job.id
+    assert result.rejected_jobs[0].filter_name == "excluded_keyword"
+    assert result.rejected_jobs[0].reason == "Matched excluded keyword: senior"
+    assert job.status == "rejected"
+
+
 def test_detect_required_experience_handles_ranges_and_missing_values() -> None:
     assert _detect_required_experience_years("Requires 1-3 years of experience.") == 1
     assert _detect_required_experience_years("Need 1 to 3 yrs experience with React.") == 1
