@@ -10,6 +10,8 @@ from backend.services.scoring_service import (
     FitScoreWeights,
     FitScoringService,
     ScoringPreferences,
+    _experience_fit_ratio,
+    _freshness_ratio,
 )
 
 
@@ -93,6 +95,31 @@ def test_fit_score_weights_must_total_100() -> None:
         assert "must total 100" in str(exc)
     else:
         raise AssertionError("Invalid weights should fail clearly.")
+
+
+def test_default_fit_score_weights_balance_skills_and_freshness() -> None:
+    weights = FitScoreWeights()
+
+    assert weights.skill_match == 20
+    assert weights.freshness == 15
+    weights.validate()
+
+
+def test_experience_fit_ratio_scores_unknown_and_fractional_experience() -> None:
+    assert _experience_fit_ratio(0.5, None) == 0.5
+    assert _experience_fit_ratio(0.5, 1.0) == 0.5
+    assert _experience_fit_ratio(0.5, 2.0) == 0.25
+    assert _experience_fit_ratio(1.0, 2.0) == 0.5
+    assert _experience_fit_ratio(2.0, 2.0) == 1.0
+
+
+def test_freshness_ratio_uses_stricter_decay_bands() -> None:
+    now = datetime.now(UTC)
+
+    assert _freshness_ratio(now - timedelta(days=7)) == 1.0
+    assert _freshness_ratio(now - timedelta(days=14)) == 0.75
+    assert _freshness_ratio(now - timedelta(days=30)) == 0.3
+    assert _freshness_ratio(now - timedelta(days=31)) == 0.0
 
 
 def test_gap_analysis_uses_resume_evidence_only() -> None:

@@ -20,7 +20,15 @@ class FilterableJob(Protocol):
 
 @dataclass(frozen=True)
 class HardFilterConfig:
-    excluded_keywords: tuple[str, ...] = ()
+    excluded_keywords: tuple[str, ...] = (
+        "senior",
+        "lead",
+        "staff",
+        "principal",
+        "manager",
+        "architect",
+        "director",
+    )
     preferred_countries: tuple[str, ...] = ()
     preferred_work_modes: tuple[str, ...] = ()
     maximum_experience_years: float | None = None
@@ -190,12 +198,22 @@ def _detect_required_experience_years(text: str) -> float | None:
     import re
 
     normalized = normalize_for_match(text)
+    number = r"\d+(?:\.\d+)?"
     patterns = (
-        r"(\d+(?:\.\d+)?)\+?\s*(?:years|yrs)\s+(?:of\s+)?experience",
-        r"experience\s+(?:of\s+)?(\d+(?:\.\d+)?)\+?\s*(?:years|yrs)",
-        r"minimum\s+(\d+(?:\.\d+)?)\+?\s*(?:years|yrs)",
+        rf"(?P<min>{number})\s*(?:-|to)\s*(?P<max>{number})\s*(?:years?|yrs?)\s+(?:of\s+)?experience",
+        rf"(?P<single>{number})\+?\s*(?:years?|yrs?)\s+(?:of\s+)?experience",
+        rf"experience\s+(?:of\s+)?(?P<single>{number})\+?\s*(?:years?|yrs?)",
+        rf"(?:minimum|min|at\s+least)\s+(?P<single>{number})\+?\s*(?:years?|yrs?)",
     )
     matches: list[float] = []
     for pattern in patterns:
-        matches.extend(float(match) for match in re.findall(pattern, normalized))
-    return max(matches) if matches else None
+        for match in re.finditer(pattern, normalized):
+            if match.groupdict().get("min"):
+                matches.append(float(match.group("min")))
+                continue
+            single = match.groupdict().get("single")
+            if single is not None:
+                matches.append(float(single))
+    if not matches:
+        return None
+    return min(matches)

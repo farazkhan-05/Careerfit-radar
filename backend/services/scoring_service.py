@@ -41,10 +41,10 @@ class ScoringPreferences:
 @dataclass(frozen=True)
 class FitScoreWeights:
     role_match: int = 15
-    skill_match: int = 25
+    skill_match: int = 20
     semantic_similarity: int = 20
     experience_fit: int = 15
-    freshness: int = 10
+    freshness: int = 15
     location_fit: int = 10
     source_reliability: int = 5
 
@@ -221,12 +221,16 @@ def _experience_fit_ratio(
     required_years: float | None,
 ) -> float:
     if required_years is None:
-        return 1.0
+        return 0.5
     if candidate_years is None:
         return 0.4
+    candidate_years = max(0.0, float(candidate_years))
+    required_years = max(0.0, float(required_years))
+    if required_years == 0:
+        return 1.0
     if candidate_years >= required_years:
         return 1.0
-    return max(0.0, candidate_years / required_years)
+    return candidate_years / required_years
 
 
 def _freshness_ratio(posted_at: datetime | None) -> float:
@@ -235,11 +239,11 @@ def _freshness_ratio(posted_at: datetime | None) -> float:
     age_days = max(0, (datetime.now(UTC) - posted_at.astimezone(UTC)).days)
     if age_days <= 7:
         return 1.0
-    if age_days <= 30:
+    if age_days <= 14:
         return 0.75
-    if age_days <= 90:
-        return 0.45
-    return 0.2
+    if age_days <= 30:
+        return 0.3
+    return 0.0
 
 
 def _location_fit_ratio(

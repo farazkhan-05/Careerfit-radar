@@ -4,7 +4,11 @@ from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
 from backend.services.deduplication_service import DeduplicationService
-from backend.services.hard_filter_service import HardFilterConfig, HardFilterService
+from backend.services.hard_filter_service import (
+    HardFilterConfig,
+    HardFilterService,
+    _detect_required_experience_years,
+)
 
 
 @dataclass
@@ -99,6 +103,25 @@ def test_hard_filter_rejects_location_experience_and_visa_rules() -> None:
     assert experience_decision.filter_name == "experience"
     assert visa_decision is not None
     assert visa_decision.filter_name == "visa_sponsorship"
+
+
+def test_hard_filter_rejects_default_senior_keywords() -> None:
+    job = FakeJob(
+        title="Principal Front End Developer",
+        description="Build user interfaces with React.",
+    )
+
+    decision = HardFilterService(HardFilterConfig()).evaluate(job)
+
+    assert decision is not None
+    assert decision.filter_name == "excluded_keyword"
+
+
+def test_detect_required_experience_handles_ranges_and_missing_values() -> None:
+    assert _detect_required_experience_years("Requires 1-3 years of experience.") == 1
+    assert _detect_required_experience_years("Need 1 to 3 yrs experience with React.") == 1
+    assert _detect_required_experience_years("Minimum 2 yrs in frontend engineering.") == 2
+    assert _detect_required_experience_years("Freshers may apply.") is None
 
 
 def test_deduplication_links_exact_duplicates_to_canonical_record() -> None:
