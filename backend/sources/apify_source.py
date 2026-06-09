@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
@@ -18,6 +19,9 @@ from backend.sources.base_source import (
     infer_remote_type,
     parse_iso_datetime,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class _ActorClient(Protocol):
@@ -125,7 +129,11 @@ class ApifySource(JobSource):
         self._search_query = ui_query
         self._search_location = ui_location
 
-        run_input = self._build_run_input(ui_query=ui_query, ui_location=ui_location)
+        run_input = {
+            "title": ui_query,
+            "location": ui_location,
+            "limit": 15,
+        }
         run = self._apify_client.actor(self._actor_config.actor_id).call(
             run_input=run_input,
             wait_duration=timedelta(seconds=self._actor_config.wait_secs),
@@ -140,6 +148,10 @@ class ApifySource(JobSource):
                 limit=self._actor_config.max_items,
             )
         )
+        if not raw_jobs:
+            logger.warning(
+                f"Apify fetched 0 jobs for '{ui_query}' in '{ui_location}'. Verify search volume on LinkedIn manually or check Apify Actor logs."
+            )
         jobs = []
         skipped = 0
         for raw_job in raw_jobs:
