@@ -100,8 +100,13 @@ def test_fit_score_weights_must_total_100() -> None:
 def test_default_fit_score_weights_balance_skills_and_freshness() -> None:
     weights = FitScoreWeights()
 
-    assert weights.skill_match == 20
+    assert weights.role_match == 20
+    assert weights.skill_match == 25
+    assert weights.semantic_similarity == 0
+    assert weights.experience_fit == 20
     assert weights.freshness == 15
+    assert weights.location_fit == 15
+    assert weights.source_reliability == 5
     weights.validate()
 
 

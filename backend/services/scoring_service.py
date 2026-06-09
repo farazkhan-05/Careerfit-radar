@@ -40,12 +40,12 @@ class ScoringPreferences:
 
 @dataclass(frozen=True)
 class FitScoreWeights:
-    role_match: int = 15
-    skill_match: int = 20
-    semantic_similarity: int = 20
-    experience_fit: int = 15
+    role_match: int = 20
+    skill_match: int = 25
+    semantic_similarity: int = 0
+    experience_fit: int = 20
     freshness: int = 15
-    location_fit: int = 10
+    location_fit: int = 15
     source_reliability: int = 5
 
     def validate(self) -> None:
