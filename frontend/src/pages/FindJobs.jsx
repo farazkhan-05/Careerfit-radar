@@ -15,6 +15,7 @@ import Badge from '../components/ui/Badge'
 import { PageSpinner } from '../components/ui/Spinner'
 
 const SOURCE_COLORS = { apify: 'teal' }
+const ACTIVE_IMPORT_STATUSES = new Set(['pending', 'running'])
 const TERMINAL_WORKFLOW_STATUSES = new Set(['completed', 'completed_with_errors', 'failed'])
 const SCORE_BATCH_LIMIT = 10
 
@@ -65,6 +66,7 @@ export default function FindJobs() {
   const [activeImportRunId, setActiveImportRunId] = useState(null)
   const [scoreProgress, setScoreProgress] = useState({ isRunning: false, remaining: null, scored: 0 })
   const mountedRef = useRef(false)
+  const ignoredImportRunIdsRef = useRef(new Set())
   const scoreRunRef = useRef(0)
 
   const [importMsg, setImportMsg] = useState(null)
@@ -107,11 +109,33 @@ export default function FindJobs() {
   const apifyMut = useMutation({
     mutationFn: importApify,
     onSuccess: (data) => {
+      ignoredImportRunIdsRef.current.delete(data.run_id)
       setActiveImportRunId(data.run_id)
       queryClient.invalidateQueries({ queryKey: ['workflowRun', data.run_id] })
     },
     onError: onImportError,
   })
+
+  useEffect(() => {
+    if (activeImportRunId) {
+      return
+    }
+
+    const activeApifyRun = runsQ.data?.items?.find((run) => {
+      const pollingId = getRunPollingId(run)
+      return (
+        run.source_name === 'apify' &&
+        ACTIVE_IMPORT_STATUSES.has(run.status) &&
+        pollingId &&
+        !ignoredImportRunIdsRef.current.has(pollingId)
+      )
+    })
+    const pollingId = getRunPollingId(activeApifyRun)
+
+    if (pollingId) {
+      setActiveImportRunId(pollingId)
+    }
+  }, [activeImportRunId, runsQ.data])
 
   useEffect(() => {
     if (!activeImportRunId || !apifyRunQ.data) {
@@ -120,6 +144,7 @@ export default function FindJobs() {
 
     if (apifyRunQ.data.status === 'completed') {
       onImportSuccess(getApifyImportSummary(apifyRunQ.data), 'Apify')
+      ignoredImportRunIdsRef.current.add(activeImportRunId)
       setActiveImportRunId(null)
       return
     }
@@ -129,6 +154,7 @@ export default function FindJobs() {
       queryClient.invalidateQueries({ queryKey: ['sourceRuns'] })
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
       setImportMsg({ type: 'error', message: `Apify import ${apifyRunQ.data.status}: ${errorMessage}` })
+      ignoredImportRunIdsRef.current.add(activeImportRunId)
       setActiveImportRunId(null)
     }
   }, [activeImportRunId, apifyRunQ.data, onImportSuccess, queryClient])
@@ -138,6 +164,7 @@ export default function FindJobs() {
       return
     }
     setImportMsg({ type: 'error', message: apifyRunQ.error.message })
+    ignoredImportRunIdsRef.current.add(activeImportRunId)
     setActiveImportRunId(null)
   }, [activeImportRunId, apifyRunQ.error, apifyRunQ.isError])
 
@@ -335,6 +362,13 @@ export default function FindJobs() {
       </Card>
     </div>
   )
+}
+
+function getRunPollingId(run) {
+  if (!run) {
+    return null
+  }
+  return run.run_id ?? run.workflow_run_id ?? run.workflow_id ?? run.id ?? null
 }
 
 function getApifyImportSummary(workflowRun) {
