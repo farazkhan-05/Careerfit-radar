@@ -53,9 +53,10 @@ def test_apify_returns_normalized_jobs_from_realistic_payload() -> None:
                     "title": "Associate Software Engineer",
                     "company": "Acme India",
                     "location": "Lucknow, Uttar Pradesh, India",
-                    "job_url": "https://example.com/jobs/linkedin-1",
+                    "jobUrl": "https://www.linkedin.com/jobs/view/linkedin-1",
+                    "applyUrl": "https://example.com/jobs/linkedin-1",
                     "description": "Build frontend and API features with React.",
-                    "date_posted": "2026-01-01T12:00:00Z",
+                    "publishedAt": "2026-01-01T12:00:00Z",
                     "job_type": "fulltime",
                     "searchQuery": "Associate Software Engineer",
                     "searchLocation": "Lucknow, Uttar Pradesh",
@@ -78,7 +79,7 @@ def test_apify_returns_normalized_jobs_from_realistic_payload() -> None:
     assert job.description == "Build frontend and API features with React."
     assert job.posted_at is not None
     assert job.source_metadata["platform"] == "linkedin"
-    assert result.metadata["actor_id"] == "openclawai/job-board-scraper"
+    assert result.metadata["actor_id"] == "scrapeengine/linkedin-jobs-scraper"
     assert result.metadata["dataset_id"] == "dataset-1"
     assert result.metadata["run_id"] == "run-1"
 
@@ -126,13 +127,14 @@ def test_apify_builds_india_full_time_search_payload() -> None:
     assert result.status == SourceStatus.SUCCESS
     run_input = fake_client.actor_client.run_input
     assert run_input is not None
-    assert run_input["searchTerms"] == ["Front End Developer"]
-    assert run_input["sites"] == ["linkedin", "indeed"]
-    assert run_input["location"] == "Lucknow, India"
-    assert run_input["countryIndeed"] == "india"
-    assert run_input["jobType"] == "fulltime"
-    assert run_input["distance"] == 50
-    assert fake_client.actor_client.actor_id == "openclawai/job-board-scraper"
+    assert run_input["companyInput"] == []
+    assert run_input["keywords"] == "Software Engineer"
+    assert run_input["location"] == "India"
+    assert run_input["maxJobs"] == 50
+    assert run_input["publishedAt"] == "r432000"
+    assert run_input["experienceLevel"] == "1,2"
+    assert run_input["proxyConfiguration"] == {"useApifyProxy": False}
+    assert fake_client.actor_client.actor_id == "scrapeengine/linkedin-jobs-scraper"
     assert fake_client.actor_client.call_kwargs["wait_duration"].total_seconds() == 120
     assert fake_client.dataset_client.iterate_kwargs["clean"] is True
     assert fake_client.dataset_client.iterate_kwargs["limit"] == 50
@@ -147,8 +149,21 @@ def test_apify_accepts_dynamic_search_payload() -> None:
     assert result.status == SourceStatus.SUCCESS
     run_input = fake_client.actor_client.run_input
     assert run_input is not None
-    assert run_input["searchTerms"] == ["React Engineer"]
+    assert run_input["keywords"] == "React Engineer"
     assert run_input["location"] == "Bengaluru, India"
+
+
+def test_apify_accepts_workflow_state_search_payload() -> None:
+    fake_client = FakeApifyClient([])
+    source = ApifySource(api_token="test-token", apify_client=fake_client)
+
+    result = source.fetch_jobs(state={"search": {"query": "Data Analyst", "location": "Pune, India"}})
+
+    assert result.status == SourceStatus.SUCCESS
+    run_input = fake_client.actor_client.run_input
+    assert run_input is not None
+    assert run_input["keywords"] == "Data Analyst"
+    assert run_input["location"] == "Pune, India"
 
 
 def test_apify_missing_token_is_handled_safely() -> None:

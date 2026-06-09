@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any, Mapping
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, Query, status
@@ -52,7 +53,7 @@ def _run_apify_import_workflow(run_id: str, query: str, location: str) -> None:
     with session_factory() as db:
         repository = WorkflowRunRepository(db)
         dependencies = JobDiscoveryWorkflowDependencies(
-            fetch_sources=lambda state: [_fetch_and_store_apify_jobs(db, query, location)]
+            fetch_sources=lambda state: [_fetch_and_store_apify_jobs(db, state)]
         )
         workflow = JobDiscoveryWorkflow(dependencies=dependencies, repository=repository)
         try:
@@ -68,10 +69,10 @@ def _run_apify_import_workflow(run_id: str, query: str, location: str) -> None:
             _mark_workflow_failed(db, repository, run_id, exc)
 
 
-def _fetch_and_store_apify_jobs(db: Session, query: str, location: str) -> dict[str, object]:
+def _fetch_and_store_apify_jobs(db: Session, state: Mapping[str, Any]) -> dict[str, object]:
     source = ApifySource()
     try:
-        result = source.fetch_jobs(query=query, location=location)
+        result = source.fetch_jobs(state=state)
     finally:
         source.close()
     response = _store_source_result(db, result.source_name, result.status.value, result.jobs, result.error_message)

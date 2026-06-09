@@ -241,9 +241,8 @@ def test_apify_import_route_queues_background_workflow(monkeypatch: Any) -> None
     class FakeApifySource:
         source_name = "apify"
 
-        def fetch_jobs(self, *, query: str | None = None, location: str | None = None) -> SourceFetchResult:
-            captured["query"] = query
-            captured["location"] = location
+        def fetch_jobs(self, *, state: dict[str, Any] | None = None) -> SourceFetchResult:
+            captured["state"] = state
             return SourceFetchResult(
                 source_name=self.source_name,
                 status=SourceStatus.SUCCESS,
@@ -266,11 +265,8 @@ def test_apify_import_route_queues_background_workflow(monkeypatch: Any) -> None
     assert response.status_code == 202
     assert response.json()["status"] == "running"
     assert response.json()["run_id"].startswith("apify-")
-    assert captured == {
-        "query": "React Engineer",
-        "location": "Bengaluru, India",
-        "closed": True,
-    }
+    assert captured["state"]["search"] == {"query": "React Engineer", "location": "Bengaluru, India"}
+    assert captured["closed"] is True
     workflow_run = next(iter(session.entities[db_models.WorkflowRun].values()))
     assert workflow_run.run_id == response.json()["run_id"]
     assert workflow_run.status == "completed"

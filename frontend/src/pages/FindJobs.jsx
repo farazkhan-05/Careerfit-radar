@@ -62,7 +62,7 @@ export default function FindJobs() {
 
   const [showManual, setShowManual] = useState(false)
   const [manualForm, setManualForm] = useState({ company_name: '', title: '', apply_url: '', location: '', remote_type: '', description: '' })
-  const [apifySearch, setApifySearch] = useState({ query: 'Front End Developer', location: 'Lucknow, India' })
+  const [apifySearch, setApifySearch] = useState({ query: 'Software Engineer', location: 'India' })
   const [activeImportRunId, setActiveImportRunId] = useState(null)
   const [scoreProgress, setScoreProgress] = useState({ isRunning: false, remaining: null, scored: 0 })
   const mountedRef = useRef(false)
@@ -246,9 +246,9 @@ export default function FindJobs() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-sm font-semibold text-slate-800">
-                Apify <span className="text-xs font-normal text-emerald-600 ml-1">LinkedIn/Indeed</span>
+                Apify <span className="text-xs font-normal text-emerald-600 ml-1">LinkedIn</span>
               </div>
-              <div className="text-xs text-slate-500">India-focused software roles</div>
+              <div className="text-xs text-slate-500">Fresh entry-level roles from your search</div>
             </div>
             <Button
               loading={apifyMut.isPending || isApifyPolling}

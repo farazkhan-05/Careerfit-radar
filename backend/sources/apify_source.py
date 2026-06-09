@@ -40,7 +40,7 @@ class _ApifyClient(Protocol):
 
 @dataclass(frozen=True)
 class ApifyActorConfig:
-    actor_id: str = "openclawai/job-board-scraper"
+    actor_id: str = "scrapeengine/linkedin-jobs-scraper"
     max_items: int = 50
     wait_secs: int = 120
 
@@ -48,8 +48,8 @@ class ApifyActorConfig:
 class ApifySource(JobSource):
     source_name = "apify"
     timeout_seconds = 120.0
-    default_query = "Front End Developer"
-    default_location = "Lucknow, India"
+    default_query = "Software Engineer"
+    default_location = "India"
 
     def __init__(
         self,
@@ -63,6 +63,7 @@ class ApifySource(JobSource):
         self._actor_config = actor_config or ApifyActorConfig()
         self._search_query = self.default_query
         self._search_location = self.default_location
+        self._workflow_state: Mapping[str, Any] = {}
         self._configuration_error: str | None = None
 
         token = api_token if api_token is not None else get_settings().apify_api_token
@@ -75,9 +76,14 @@ class ApifySource(JobSource):
             return
         self._apify_client = ApifyClient(token.strip())
 
-    def fetch_jobs(self, *, query: str | None = None, location: str | None = None) -> SourceFetchResult:
-        self._search_query = _normalize_search_text(query, self.default_query)
-        self._search_location = _normalize_search_text(location, self.default_location)
+    def fetch_jobs(
+        self,
+        *,
+        query: str | None = None,
+        location: str | None = None,
+        state: Mapping[str, Any] | None = None,
+    ) -> SourceFetchResult:
+        self._workflow_state = _search_state_from_values(query=query, location=location, state=state)
         if self._configuration_error is not None:
             started_at = datetime.now(UTC)
             return SourceFetchResult(
@@ -105,7 +111,21 @@ class ApifySource(JobSource):
         if self._apify_client is None:
             raise RuntimeError("APIFY_API_TOKEN is not configured.")
 
-        run_input = self._build_run_input()
+        state = self._workflow_state
+        search = state.get("search", {})
+        if not isinstance(search, Mapping):
+            search = {}
+        raw_query = search.get("query")
+        raw_location = search.get("location")
+        ui_query = _normalize_search_text(raw_query if isinstance(raw_query, str) else None, self.default_query)
+        ui_location = _normalize_search_text(
+            raw_location if isinstance(raw_location, str) else None,
+            self.default_location,
+        )
+        self._search_query = ui_query
+        self._search_location = ui_location
+
+        run_input = self._build_run_input(ui_query=ui_query, ui_location=ui_location)
         run = self._apify_client.actor(self._actor_config.actor_id).call(
             run_input=run_input,
             wait_duration=timedelta(seconds=self._actor_config.wait_secs),
@@ -145,28 +165,26 @@ class ApifySource(JobSource):
             "search_payload": run_input,
         }
 
-    def _build_run_input(self) -> dict[str, Any]:
+    def _build_run_input(self, *, ui_query: str | None = None, ui_location: str | None = None) -> dict[str, Any]:
+        search_query = _normalize_search_text(ui_query or self._search_query, self.default_query)
+        search_location = _normalize_search_text(ui_location or self._search_location, self.default_location)
         return {
-            "searchTerms": [self._search_query],
-            "location": self._search_location,
-            "sites": ["linkedin", "indeed"],
-            "maxResults": self._actor_config.max_items,
-            "jobType": "fulltime",
-            "hoursOld": 720,
-            "countryIndeed": "india",
-            "distance": 50,
-            "linkedinFetchDescription": True,
-            "descriptionFormat": "markdown",
+            "companyInput": [],
+            "keywords": search_query,
+            "location": search_location,
+            "maxJobs": self._actor_config.max_items,
+            "publishedAt": "r432000",
+            "experienceLevel": "1,2",
+            "geoId": "",
             "proxyConfiguration": {
-                "useApifyProxy": True,
-                "apifyProxyGroups": ["RESIDENTIAL"],
+                "useApifyProxy": False,
             },
         }
 
     def _normalize_job(self, raw_job: dict[str, Any]) -> NormalizedJob | None:
         title = _first_text(raw_job, "title", "jobTitle", "position", "name")
         company_name = _first_text(raw_job, "companyName", "company_name", "company", "employer")
-        apply_url = _first_text(raw_job, "applyUrl", "apply_url", "jobUrl", "job_url", "url", "link")
+        apply_url = _apply_url(raw_job)
         description = _first_text(
             raw_job,
             "description",
@@ -242,14 +260,15 @@ def _location(payload: Mapping[str, Any]) -> str | None:
 def _posted_at(payload: Mapping[str, Any]) -> datetime | None:
     raw_value = _get_value(
         payload,
-        "postedAt",
-        "posted_at",
         "publishedAt",
         "published_at",
+        "postedAt",
+        "posted_at",
         "date_posted",
         "datePosted",
         "postedDate",
         "createdAt",
+        "listedAt",
     )
     if isinstance(raw_value, (int, float)):
         from backend.sources.base_source import parse_timestamp_millis
@@ -271,3 +290,30 @@ def _normalize_search_text(value: str | None, default: str) -> str:
         return default
     normalized = value.strip()
     return normalized or default
+
+
+def _search_state_from_values(
+    *,
+    query: str | None,
+    location: str | None,
+    state: Mapping[str, Any] | None,
+) -> Mapping[str, Any]:
+    if state is not None:
+        return state
+    return {"search": {"query": query, "location": location}}
+
+
+def _apply_url(payload: Mapping[str, Any]) -> str:
+    return _first_text(
+        payload,
+        "applyUrl",
+        "apply_url",
+        "externalApplyUrl",
+        "external_apply_url",
+        "applicationUrl",
+        "application_url",
+        "jobUrl",
+        "job_url",
+        "url",
+        "link",
+    )
