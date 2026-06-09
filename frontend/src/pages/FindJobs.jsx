@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, ChevronUp, Plus, Sparkles, Zap } from 'lucide-react'
 import { importApify, listSourceRuns } from '../api/sources'
-import { getWorkflowRun } from '../api/workflows'
+import { getWorkflowRun, listWorkflows } from '../api/workflows'
 import { createManualJob } from '../api/jobs'
 import { scoreJobs } from '../api/profiles'
 import { listProfiles } from '../api/profiles'
@@ -74,6 +74,7 @@ export default function FindJobs() {
   const [manualMsg, setManualMsg] = useState(null)
 
   const runsQ = useQuery({ queryKey: ['sourceRuns'], queryFn: () => listSourceRuns({ limit: 20 }) })
+  const workflowsQ = useQuery({ queryKey: ['workflows', 'active'], queryFn: () => listWorkflows({ limit: 10 }) })
   const profilesQ = useQuery({ queryKey: ['profiles'], queryFn: () => listProfiles(1, 0) })
   const apifyRunQ = useQuery({
     queryKey: ['workflowRun', activeImportRunId],
@@ -121,21 +122,19 @@ export default function FindJobs() {
       return
     }
 
-    const activeApifyRun = runsQ.data?.items?.find((run) => {
-      const pollingId = getRunPollingId(run)
+    const activeApifyWorkflow = workflowsQ.data?.items?.find((workflow) => {
       return (
-        run.source_name === 'apify' &&
-        ACTIVE_IMPORT_STATUSES.has(run.status) &&
-        pollingId &&
-        !ignoredImportRunIdsRef.current.has(pollingId)
+        workflow.source_name === 'apify' &&
+        ACTIVE_IMPORT_STATUSES.has(workflow.status) &&
+        workflow.run_id &&
+        !ignoredImportRunIdsRef.current.has(workflow.run_id)
       )
     })
-    const pollingId = getRunPollingId(activeApifyRun)
 
-    if (pollingId) {
-      setActiveImportRunId(pollingId)
+    if (activeApifyWorkflow?.run_id) {
+      setActiveImportRunId(activeApifyWorkflow.run_id)
     }
-  }, [activeImportRunId, runsQ.data])
+  }, [activeImportRunId, workflowsQ.data])
 
   useEffect(() => {
     if (!activeImportRunId || !apifyRunQ.data) {
@@ -362,13 +361,6 @@ export default function FindJobs() {
       </Card>
     </div>
   )
-}
-
-function getRunPollingId(run) {
-  if (!run) {
-    return null
-  }
-  return run.run_id ?? run.workflow_run_id ?? run.workflow_id ?? run.id ?? null
 }
 
 function getApifyImportSummary(workflowRun) {
