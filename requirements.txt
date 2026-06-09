@@ -1,4 +1,3 @@
-apify-client
 alembic
 beautifulsoup4
 fastapi[standard]
@@ -13,6 +12,7 @@ psycopg[binary]
 pydantic
 pydantic-settings
 pypdf
+requests
 python-docx
 python-multipart
 pytest
