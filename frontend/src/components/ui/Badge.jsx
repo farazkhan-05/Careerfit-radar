@@ -36,7 +36,7 @@ export function StatusBadge({ status }) {
 
 export function SourceBadge({ source }) {
   const sourceColors = {
-    apify: 'teal',
+    google_search: 'teal',
     manual: 'gray',
     smartrecruiters: 'violet',
   }

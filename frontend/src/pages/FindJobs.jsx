@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, ChevronUp, Plus, Sparkles, Zap } from 'lucide-react'
-import { importApify, listSourceRuns } from '../api/sources'
+import { importGoogleSearch, listSourceRuns } from '../api/sources'
 import { getWorkflowRun, listWorkflows } from '../api/workflows'
 import { createManualJob } from '../api/jobs'
 import { scoreJobs } from '../api/profiles'
@@ -14,7 +14,7 @@ import EmptyState from '../components/ui/EmptyState'
 import Badge from '../components/ui/Badge'
 import { PageSpinner } from '../components/ui/Spinner'
 
-const SOURCE_COLORS = { apify: 'teal' }
+const SOURCE_COLORS = { google_search: 'teal' }
 const ACTIVE_IMPORT_STATUSES = new Set(['pending', 'running'])
 const TERMINAL_WORKFLOW_STATUSES = new Set(['completed', 'completed_with_errors', 'failed'])
 const SCORE_BATCH_LIMIT = 10
@@ -22,7 +22,7 @@ const SCORE_BATCH_LIMIT = 10
 function RunsTable({ runs }) {
   if (runs.length === 0) {
     return (
-      <EmptyState icon="list" title="No imports yet" description="Import jobs from Apify to get started." />
+      <EmptyState icon="list" title="No imports yet" description="Search the web to import ATS jobs." />
     )
   }
   return (
@@ -62,7 +62,7 @@ export default function FindJobs() {
 
   const [showManual, setShowManual] = useState(false)
   const [manualForm, setManualForm] = useState({ company_name: '', title: '', apply_url: '', location: '', remote_type: '', description: '' })
-  const [apifySearch, setApifySearch] = useState({ query: 'Software Engineer', location: 'India' })
+  const [webSearch, setWebSearch] = useState({ query: 'Software Engineer', location: 'India' })
   const [activeImportRunId, setActiveImportRunId] = useState(null)
   const [scoreProgress, setScoreProgress] = useState({ isRunning: false, remaining: null, scored: 0 })
   const mountedRef = useRef(false)
@@ -76,7 +76,7 @@ export default function FindJobs() {
   const runsQ = useQuery({ queryKey: ['sourceRuns'], queryFn: () => listSourceRuns({ limit: 20 }) })
   const workflowsQ = useQuery({ queryKey: ['workflows', 'active'], queryFn: () => listWorkflows({ limit: 10 }) })
   const profilesQ = useQuery({ queryKey: ['profiles'], queryFn: () => listProfiles(1, 0) })
-  const apifyRunQ = useQuery({
+  const importRunQ = useQuery({
     queryKey: ['workflowRun', activeImportRunId],
     queryFn: () => getWorkflowRun(activeImportRunId),
     enabled: Boolean(activeImportRunId),
@@ -87,7 +87,7 @@ export default function FindJobs() {
     retry: 3,
   })
   const profile = profilesQ.data?.items?.[0]
-  const isApifyPolling = Boolean(activeImportRunId)
+  const isImportPolling = Boolean(activeImportRunId)
 
   useEffect(() => {
     mountedRef.current = true
@@ -107,8 +107,8 @@ export default function FindJobs() {
     setImportMsg({ type: 'error', message: err.message })
   }, [])
 
-  const apifyMut = useMutation({
-    mutationFn: importApify,
+  const webSearchMut = useMutation({
+    mutationFn: importGoogleSearch,
     onSuccess: (data) => {
       ignoredImportRunIdsRef.current.delete(data.run_id)
       setActiveImportRunId(data.run_id)
@@ -122,50 +122,50 @@ export default function FindJobs() {
       return
     }
 
-    const activeApifyWorkflow = workflowsQ.data?.items?.find((workflow) => {
+    const activeGoogleWorkflow = workflowsQ.data?.items?.find((workflow) => {
       return (
-        workflow.source_name === 'apify' &&
+        workflow.source_name === 'google_search' &&
         ACTIVE_IMPORT_STATUSES.has(workflow.status) &&
         workflow.run_id &&
         !ignoredImportRunIdsRef.current.has(workflow.run_id)
       )
     })
 
-    if (activeApifyWorkflow?.run_id) {
-      setActiveImportRunId(activeApifyWorkflow.run_id)
+    if (activeGoogleWorkflow?.run_id) {
+      setActiveImportRunId(activeGoogleWorkflow.run_id)
     }
   }, [activeImportRunId, workflowsQ.data])
 
   useEffect(() => {
-    if (!activeImportRunId || !apifyRunQ.data) {
+    if (!activeImportRunId || !importRunQ.data) {
       return
     }
 
-    if (apifyRunQ.data.status === 'completed') {
-      onImportSuccess(getApifyImportSummary(apifyRunQ.data), 'Apify')
+    if (importRunQ.data.status === 'completed') {
+      onImportSuccess(getGoogleSearchImportSummary(importRunQ.data), 'Google Search')
       ignoredImportRunIdsRef.current.add(activeImportRunId)
       setActiveImportRunId(null)
       return
     }
 
-    if (TERMINAL_WORKFLOW_STATUSES.has(apifyRunQ.data.status)) {
-      const errorMessage = getWorkflowErrorMessage(apifyRunQ.data)
+    if (TERMINAL_WORKFLOW_STATUSES.has(importRunQ.data.status)) {
+      const errorMessage = getWorkflowErrorMessage(importRunQ.data)
       queryClient.invalidateQueries({ queryKey: ['sourceRuns'] })
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
-      setImportMsg({ type: 'error', message: `Apify import ${apifyRunQ.data.status}: ${errorMessage}` })
+      setImportMsg({ type: 'error', message: `Web search import ${importRunQ.data.status}: ${errorMessage}` })
       ignoredImportRunIdsRef.current.add(activeImportRunId)
       setActiveImportRunId(null)
     }
-  }, [activeImportRunId, apifyRunQ.data, onImportSuccess, queryClient])
+  }, [activeImportRunId, importRunQ.data, onImportSuccess, queryClient])
 
   useEffect(() => {
-    if (!activeImportRunId || !apifyRunQ.isError) {
+    if (!activeImportRunId || !importRunQ.isError) {
       return
     }
-    setImportMsg({ type: 'error', message: apifyRunQ.error.message })
+    setImportMsg({ type: 'error', message: importRunQ.error.message })
     ignoredImportRunIdsRef.current.add(activeImportRunId)
     setActiveImportRunId(null)
-  }, [activeImportRunId, apifyRunQ.error, apifyRunQ.isError])
+  }, [activeImportRunId, importRunQ.error, importRunQ.isError])
 
   const scoreMut = useMutation({ mutationFn: scoreJobs })
   const isScoring = scoreProgress.isRunning || scoreMut.isPending
@@ -246,35 +246,35 @@ export default function FindJobs() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-sm font-semibold text-slate-800">
-                Apify <span className="text-xs font-normal text-emerald-600 ml-1">LinkedIn</span>
+                Direct Web Search <span className="text-xs font-normal text-emerald-600 ml-1">ATS Boards</span>
               </div>
-              <div className="text-xs text-slate-500">Fresh entry-level roles from your search</div>
+              <div className="text-xs text-slate-500">Searches Greenhouse, Lever, Workday, Ashby &amp; iCIMS directly</div>
             </div>
             <Button
-              loading={apifyMut.isPending || isApifyPolling}
-              disabled={isApifyPolling || !apifySearch.query.trim() || !apifySearch.location.trim()}
-              onClick={() => { setImportMsg(null); apifyMut.mutate(apifySearch) }}
+              loading={webSearchMut.isPending || isImportPolling}
+              disabled={isImportPolling || !webSearch.query.trim() || !webSearch.location.trim()}
+              onClick={() => { setImportMsg(null); webSearchMut.mutate(webSearch) }}
             >
-              Import
+              Search
             </Button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="Search Query"
-              value={apifySearch.query}
-              onChange={(e) => setApifySearch((search) => ({ ...search, query: e.target.value }))}
-              disabled={apifyMut.isPending || isApifyPolling}
+              value={webSearch.query}
+              onChange={(e) => setWebSearch((s) => ({ ...s, query: e.target.value }))}
+              disabled={webSearchMut.isPending || isImportPolling}
             />
             <Input
               label="Location"
-              value={apifySearch.location}
-              onChange={(e) => setApifySearch((search) => ({ ...search, location: e.target.value }))}
-              disabled={apifyMut.isPending || isApifyPolling}
+              value={webSearch.location}
+              onChange={(e) => setWebSearch((s) => ({ ...s, location: e.target.value }))}
+              disabled={webSearchMut.isPending || isImportPolling}
             />
           </div>
-          {isApifyPolling && (
+          {isImportPolling && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              Scraping in progress... this may take a few minutes
+              Searching ATS boards... this may take a few seconds
             </div>
           )}
         </div>
@@ -363,8 +363,8 @@ export default function FindJobs() {
   )
 }
 
-function getApifyImportSummary(workflowRun) {
-  const sourceResult = workflowRun.state?.source_results?.find((result) => result.source_name === 'apify') ?? {}
+function getGoogleSearchImportSummary(workflowRun) {
+  const sourceResult = workflowRun.state?.source_results?.find((result) => result.source_name === 'google_search') ?? {}
   return {
     jobs_fetched: Number(sourceResult.jobs_fetched ?? 0),
     jobs_stored: Number(sourceResult.jobs_stored ?? 0),

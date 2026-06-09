@@ -202,7 +202,7 @@ export default function Jobs() {
           <div className="w-36">
             <Select value={source} onChange={(e) => { setSource(e.target.value); setOffset(0) }}>
               <option value="">All sources</option>
-              <option value="apify">Apify</option>
+              <option value="google_search">Google Search</option>
               <option value="manual">Manual</option>
             </Select>
           </div>
