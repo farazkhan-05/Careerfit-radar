@@ -36,7 +36,7 @@ class ManualJobCreate(BaseModel):
     description: str = Field(min_length=1)
 
 
-class ApifyImportRequest(BaseModel):
+class GoogleSearchImportRequest(BaseModel):
     query: str = Field(default="Front End Developer", min_length=1, max_length=255)
     location: str = Field(default="Lucknow, India", min_length=1, max_length=255)
 

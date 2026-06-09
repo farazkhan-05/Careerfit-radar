@@ -9,10 +9,10 @@ from sqlalchemy.orm import Session
 
 from backend.database import SessionLocal, get_db
 from backend.models import db_models
-from backend.models.api_schemas import ApifyImportRequest, PageResponse, SourceImportResponse, WorkflowTriggerResponse
+from backend.models.api_schemas import GoogleSearchImportRequest, PageResponse, SourceImportResponse, WorkflowTriggerResponse
 from backend.models.schemas import SourceRunCreate, SourceRunRead
 from backend.routes.crud import PaginationParams, create_entity, delete_entity, get_or_404, paginate, update_entity
-from backend.sources.apify_source import ApifySource
+from backend.sources.google_search_source import GoogleSearchSource
 from backend.sources.base_source import NormalizedJob, SourceStatus
 from backend.workflows.job_discovery_graph import (
     JobDiscoveryWorkflow,
@@ -24,43 +24,43 @@ from backend.workflows.job_discovery_graph import (
 router = APIRouter(prefix="/sources", tags=["sources"])
 
 
-@router.post("/import/apify", response_model=WorkflowTriggerResponse, status_code=status.HTTP_202_ACCEPTED)
-def import_apify_jobs(
+@router.post("/import/google-search", response_model=WorkflowTriggerResponse, status_code=status.HTTP_202_ACCEPTED)
+def import_google_search_jobs(
     background_tasks: BackgroundTasks,
-    payload: ApifyImportRequest | None = Body(default=None),
+    payload: GoogleSearchImportRequest | None = Body(default=None),
     db: Session = Depends(get_db),
 ) -> WorkflowTriggerResponse:
-    search = payload or ApifyImportRequest()
-    run_id = f"apify-{uuid4()}"
+    search = payload or GoogleSearchImportRequest()
+    run_id = f"google-search-{uuid4()}"
     repository = WorkflowRunRepository(db)
     persisted = repository.save_state(
         create_initial_state(
             {
                 "run_id": run_id,
-                "source_name": "apify",
+                "source_name": "google_search",
                 "status": "running",
                 "search": {"query": search.query, "location": search.location},
             }
         )
     )
     db.commit()
-    background_tasks.add_task(_run_apify_import_workflow, run_id, search.query, search.location)
+    background_tasks.add_task(_run_google_search_import_workflow, run_id, search.query, search.location)
     return WorkflowTriggerResponse(run_id=run_id, status="running", workflow_id=persisted.id)
 
 
-def _run_apify_import_workflow(run_id: str, query: str, location: str) -> None:
+def _run_google_search_import_workflow(run_id: str, query: str, location: str) -> None:
     session_factory = SessionLocal()
     with session_factory() as db:
         repository = WorkflowRunRepository(db)
         dependencies = JobDiscoveryWorkflowDependencies(
-            fetch_sources=lambda state: [_fetch_and_store_apify_jobs(db, state)]
+            fetch_sources=lambda state: [_fetch_and_store_google_search_jobs(db, state)]
         )
         workflow = JobDiscoveryWorkflow(dependencies=dependencies, repository=repository)
         try:
             workflow.run(
                 {
                     "run_id": run_id,
-                    "source_name": "apify",
+                    "source_name": "google_search",
                     "search": {"query": query, "location": location},
                 }
             )
@@ -69,8 +69,8 @@ def _run_apify_import_workflow(run_id: str, query: str, location: str) -> None:
             _mark_workflow_failed(db, repository, run_id, exc)
 
 
-def _fetch_and_store_apify_jobs(db: Session, state: Mapping[str, Any]) -> dict[str, object]:
-    source = ApifySource()
+def _fetch_and_store_google_search_jobs(db: Session, state: Mapping[str, Any]) -> dict[str, object]:
+    source = GoogleSearchSource()
     try:
         result = source.fetch_jobs(state=state)
     finally:
@@ -87,7 +87,7 @@ def _mark_workflow_failed(
 ) -> None:
     existing = repository.get_run(run_id)
     state = dict(existing.state) if existing is not None and isinstance(existing.state, dict) else create_initial_state(
-        {"run_id": run_id, "source_name": "apify"}
+        {"run_id": run_id, "source_name": "google_search"}
     )
     errors = list(state.get("errors", []))
     errors.append(

@@ -35,7 +35,7 @@ class ScorableJobRequirement(Protocol):
 class ScoringPreferences:
     preferred_countries: tuple[str, ...] = ()
     preferred_work_modes: tuple[str, ...] = ()
-    preferred_sources: tuple[str, ...] = ("apify",)
+    preferred_sources: tuple[str, ...] = ("google_search",)
 
 
 @dataclass(frozen=True)
