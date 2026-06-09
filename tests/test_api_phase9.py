@@ -341,6 +341,63 @@ def test_score_jobs_respects_batch_limit_and_returns_remaining_count(monkeypatch
     assert len(session.entities[db_models.JobScore]) == 2
 
 
+def test_score_jobs_prefers_database_requirements(monkeypatch: Any) -> None:
+    profile_id = uuid4()
+    stored_requirements = SimpleNamespace(
+        required_skills=["Gemini Skill"],
+        preferred_skills=["Stored Preferred"],
+        min_experience_years=2.0,
+    )
+    jobs = [
+        SimpleNamespace(
+            id=uuid4(),
+            title="AI Engineer",
+            description="This text would trigger the regex fallback.",
+            requirements=stored_requirements,
+        )
+    ]
+    session = FakeScoreSession(profile_id=profile_id, jobs=jobs)
+    captured: dict[str, Any] = {}
+
+    class FakeScore:
+        def model_dump(self, *, mode: str) -> dict[str, Any]:
+            return {
+                "job_id": jobs[0].id,
+                "candidate_profile_id": profile_id,
+                "final_score": 80,
+                "role_match_score": 10,
+                "skill_match_score": 20,
+                "semantic_similarity_score": 0,
+                "experience_fit_score": 10,
+                "freshness_score": 10,
+                "location_fit_score": 10,
+                "source_reliability_score": 20,
+                "matched_skills": [],
+                "missing_skills": [],
+                "risk_flags": [],
+                "explanation": "Good fit.",
+            }
+
+    class FakeFitScoringService:
+        def score_job(self, *, job: Any, candidate_profile: Any, requirements: Any) -> Any:
+            captured["requirements"] = requirements
+            return SimpleNamespace(score=FakeScore())
+
+    def fail_infer_requirements(*_args: Any, **_kwargs: Any) -> None:
+        raise AssertionError("Regex fallback should not run when database requirements exist.")
+
+    monkeypatch.setattr(profile_routes, "FitScoringService", FakeFitScoringService)
+    monkeypatch.setattr(profile_routes, "_infer_requirements", fail_infer_requirements)
+
+    response = profile_routes.score_jobs(limit=1, db=session)
+
+    requirements = captured["requirements"]
+    assert response["scored_count"] == 1
+    assert requirements.required_skills == ["Gemini Skill"]
+    assert requirements.preferred_skills == ["Stored Preferred"]
+    assert requirements.min_experience_years == 2.0
+
+
 def test_health_readiness_checks_database_and_gemini_config() -> None:
     session = FakeSession()
 

@@ -6,7 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
 from sqlalchemy import delete, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from backend.database import get_db
 from backend.models import db_models
@@ -60,6 +60,7 @@ def score_jobs(
 
     jobs = db.execute(
         unscored_jobs
+        .options(selectinload(db_models.Job.requirements))
         .order_by(db_models.Job.fetched_at.desc(), db_models.Job.id)
         .limit(limit)
     ).scalars().all()
@@ -79,7 +80,7 @@ def score_jobs(
     service = FitScoringService()
 
     for job in jobs:
-        req = _infer_requirements(job.description, candidate_skills)
+        req = _requirements_for_scoring(job, candidate_skills)
         result = service.score_job(job=job, candidate_profile=profile, requirements=req)
         db.add(db_models.JobScore(**result.score.model_dump(mode="json")))
 
@@ -113,6 +114,13 @@ class _InferredReq:
     min_experience_years: float | None = None
 
 
+@dataclass(frozen=True)
+class _StoredReq:
+    required_skills: list[str] = field(default_factory=list)
+    preferred_skills: list[str] = field(default_factory=list)
+    min_experience_years: float | None = None
+
+
 _EXP_PATTERNS = (
     re.compile(r"(\d+(?:\.\d+)?)\+?\s*(?:years|yrs)\s+(?:of\s+)?experience", re.I),
     re.compile(r"experience\s+(?:of\s+)?(\d+(?:\.\d+)?)\+?\s*(?:years|yrs)", re.I),
@@ -126,6 +134,23 @@ def _extract_all_skills(profile: db_models.CandidateProfile) -> list[str]:
         if isinstance(value, list):
             skills.extend(str(s) for s in value if s)
     return skills
+
+
+def _requirements_for_scoring(job: db_models.Job, candidate_skills: list[str]) -> _StoredReq | _InferredReq:
+    stored = getattr(job, "requirements", None)
+    if stored is not None:
+        return _StoredReq(
+            required_skills=_clean_requirement_list(stored.required_skills),
+            preferred_skills=_clean_requirement_list(stored.preferred_skills),
+            min_experience_years=stored.min_experience_years,
+        )
+    return _infer_requirements(job.description, candidate_skills)
+
+
+def _clean_requirement_list(values: list[str] | None) -> list[str]:
+    if not values:
+        return []
+    return [str(value) for value in values if value]
 
 
 def _infer_requirements(description: str, candidate_skills: list[str]) -> _InferredReq:
