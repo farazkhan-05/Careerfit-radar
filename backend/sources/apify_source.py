@@ -40,7 +40,7 @@ class _ApifyClient(Protocol):
 
 @dataclass(frozen=True)
 class ApifyActorConfig:
-    actor_id: str = "scrapeengine/linkedin-jobs-scraper"
+    actor_id: str = "valig/linkedin-jobs-scraper"
     max_items: int = 50
     wait_secs: int = 120
 
@@ -169,57 +169,61 @@ class ApifySource(JobSource):
         search_query = _normalize_search_text(ui_query or self._search_query, self.default_query)
         search_location = _normalize_search_text(ui_location or self._search_location, self.default_location)
         return {
-            "companyInput": [],
-            "keywords": search_query,
+            "title": search_query,
             "location": search_location,
-            "maxJobs": self._actor_config.max_items,
-            "publishedAt": "r432000",
-            "experienceLevel": "1,2",
-            "geoId": "",
-            "proxyConfiguration": {
-                "useApifyProxy": False,
-            },
+            "datePosted": "r604800",
+            "experienceLevel": ["1", "2"],
+            "limit": self._actor_config.max_items,
         }
 
     def _normalize_job(self, raw_job: dict[str, Any]) -> NormalizedJob | None:
-        title = _first_text(raw_job, "title", "jobTitle", "position", "name")
-        company_name = _first_text(raw_job, "companyName", "company_name", "company", "employer")
-        apply_url = _apply_url(raw_job)
-        description = _first_text(
-            raw_job,
-            "description",
-            "descriptionText",
-            "descriptionHTML",
-            "snippet",
-            "summary",
+        title = as_text(raw_job.get("title", "Unknown Title")) or "Unknown Title"
+        company_name = as_text(raw_job.get("companyName", raw_job.get("company", "Unknown Company"))) or "Unknown Company"
+        apply_url = as_text(raw_job.get("applyUrl", raw_job.get("link", raw_job.get("url", ""))))
+        description = as_text(
+            raw_job.get(
+                "descriptionText",
+                raw_job.get("descriptionHtml", raw_job.get("description", "")),
+            )
         )
 
-        if not title or not company_name or not apply_url:
+        if not apply_url:
             return None
 
         location = _location(raw_job)
         description = description or title
-        return NormalizedJob(
-            source=self.source_name,
-            source_job_id=_source_job_id(raw_job, apply_url, title, company_name),
-            company_name=company_name,
-            title=title,
-            location=location,
-            remote_type=infer_remote_type(
-                location,
-                _first_text(raw_job, "remote", "remoteType", "workplaceType", "jobType", "employmentType"),
-            ),
-            posted_at=_posted_at(raw_job),
-            apply_url=apply_url,
-            description=description,
-            source_metadata={
-                "actor_id": self._actor_config.actor_id,
-                "platform": _first_text(raw_job, "platform", "source", "site") or "apify",
-                "search_query": _first_text(raw_job, "query", "searchQuery", "search_query"),
-                "search_location": _first_text(raw_job, "searchLocation", "search_location"),
-            },
-            raw_payload=raw_job,
-        )
+        try:
+            return NormalizedJob(
+                source=self.source_name,
+                source_job_id=_source_job_id(raw_job, apply_url, title, company_name),
+                company_name=company_name,
+                title=title,
+                location=location,
+                remote_type=infer_remote_type(
+                    location,
+                    _first_text(
+                        raw_job,
+                        "remote",
+                        "remoteType",
+                        "workplaceType",
+                        "jobType",
+                        "employmentType",
+                        "workType",
+                    ),
+                ),
+                posted_at=_posted_at(raw_job),
+                apply_url=apply_url,
+                description=description,
+                source_metadata={
+                    "actor_id": self._actor_config.actor_id,
+                    "platform": _first_text(raw_job, "platform", "source", "site") or "linkedin",
+                    "search_query": _first_text(raw_job, "query", "searchQuery", "search_query"),
+                    "search_location": _first_text(raw_job, "searchLocation", "search_location"),
+                },
+                raw_payload=raw_job,
+            )
+        except ValueError:
+            return None
 
 
 def _get_value(payload: Any, *keys: str) -> Any:
@@ -267,6 +271,7 @@ def _posted_at(payload: Mapping[str, Any]) -> datetime | None:
         "date_posted",
         "datePosted",
         "postedDate",
+        "date",
         "createdAt",
         "listedAt",
     )
@@ -301,19 +306,3 @@ def _search_state_from_values(
     if state is not None:
         return state
     return {"search": {"query": query, "location": location}}
-
-
-def _apply_url(payload: Mapping[str, Any]) -> str:
-    return _first_text(
-        payload,
-        "applyUrl",
-        "apply_url",
-        "externalApplyUrl",
-        "external_apply_url",
-        "applicationUrl",
-        "application_url",
-        "jobUrl",
-        "job_url",
-        "url",
-        "link",
-    )
