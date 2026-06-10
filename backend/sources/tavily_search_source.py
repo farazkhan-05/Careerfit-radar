@@ -22,22 +22,26 @@ from backend.sources.base_source import (
 
 logger = logging.getLogger(__name__)
 
+_TAVILY_SEARCH_URL = "https://api.tavily.com/search"
+_REQUEST_TIMEOUT = 20
+_MAX_RESULTS = 12
 _ATS_DOMAINS = (
-    "site:boards.greenhouse.io OR site:jobs.lever.co OR site:myworkdayjobs.com"
-    " OR site:jobs.ashbyhq.com OR site:boards.icims.com"
+    "boards.greenhouse.io",
+    "job-boards.greenhouse.io",
+    "jobs.lever.co",
+    "myworkdayjobs.com",
+    "jobs.ashbyhq.com",
+    "boards.icims.com",
 )
-_GOOGLE_CSE_URL = "https://www.googleapis.com/customsearch/v1"
-_REQUEST_TIMEOUT = 10
-_MAX_RESULTS = 10
 
 
-class GoogleSearchProviderError(RuntimeError):
-    """Sanitized provider error that never includes request URLs or API keys."""
+class TavilyProviderError(RuntimeError):
+    """Sanitized provider error that never includes API keys."""
 
 
-class GoogleSearchSource(JobSource):
-    source_name = "google_search"
-    timeout_seconds = 15.0
+class TavilySearchSource(JobSource):
+    source_name = "tavily_search"
+    timeout_seconds = 25.0
     default_query = "Software Engineer"
     default_location = "India"
 
@@ -45,14 +49,12 @@ class GoogleSearchSource(JobSource):
         self,
         *,
         api_key: str | None = None,
-        engine_id: str | None = None,
         http_session: requests.Session | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         settings = get_settings()
-        self._api_key = api_key if api_key is not None else settings.google_search_api_key
-        self._engine_id = engine_id if engine_id is not None else settings.google_search_engine_id
+        self._api_key = api_key if api_key is not None else settings.tavily_api_key
         self._session = http_session or requests.Session()
         self._external_session = http_session is not None
         self._workflow_state: Mapping[str, Any] = {}
@@ -72,8 +74,8 @@ class GoogleSearchSource(JobSource):
         self._workflow_state = _state_from_values(query=query, location=location, state=state)
         try:
             return super().fetch_jobs()
-        except GoogleSearchProviderError as exc:
-            logger.warning("GoogleSearchSource.fetch_jobs failed: %s", exc)
+        except TavilyProviderError as exc:
+            logger.warning("TavilySearchSource.fetch_jobs failed: %s", exc)
             return SourceFetchResult(
                 source_name=self.source_name,
                 status=SourceStatus.FAILED,
@@ -82,7 +84,7 @@ class GoogleSearchSource(JobSource):
                 error_message=str(exc),
             )
         except (RequestException, RuntimeError, ValueError) as exc:
-            logger.exception("GoogleSearchSource.fetch_jobs failed")
+            logger.exception("TavilySearchSource.fetch_jobs failed")
             return SourceFetchResult(
                 source_name=self.source_name,
                 status=SourceStatus.FAILED,
@@ -92,10 +94,10 @@ class GoogleSearchSource(JobSource):
             )
 
     def _fetch_jobs(self) -> tuple[list[NormalizedJob], Mapping[str, Any]]:
-        if not self._api_key or not self._engine_id:
-            raise GoogleSearchProviderError(
-                "Google Search is not configured. Set GOOGLE_SEARCH_API_KEY and "
-                "GOOGLE_SEARCH_ENGINE_ID in the backend environment, then restart the API."
+        if not self._api_key:
+            raise TavilyProviderError(
+                "Tavily Search is not configured. Set TAVILY_API_KEY in the backend "
+                "environment, then restart the API."
             )
 
         state = self._workflow_state
@@ -114,21 +116,38 @@ class GoogleSearchSource(JobSource):
             self.default_location,
         )
 
-        search_query = f'({_ATS_DOMAINS}) "{ui_query}" "{ui_location}"'
-        params: dict[str, Any] = {
-            "key": self._api_key,
-            "cx": self._engine_id,
-            "q": search_query,
-            "dateRestrict": "d7",
-            "num": _MAX_RESULTS,
+        search_query = f'{ui_query} jobs "{ui_location}" apply'
+        payload: dict[str, Any] = {
+            "query": search_query,
+            "search_depth": "basic",
+            "topic": "general",
+            "max_results": _MAX_RESULTS,
+            "include_answer": False,
+            "include_raw_content": False,
+            "include_images": False,
+            "include_domains": list(_ATS_DOMAINS),
+            "include_usage": True,
+        }
+        country = _country_from_location(ui_location)
+        if country:
+            payload["country"] = country
+
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
         }
 
-        logger.info("GoogleSearchSource: querying CSE — %s", search_query)
-        response = self._session.get(_GOOGLE_CSE_URL, params=params, timeout=_REQUEST_TIMEOUT)
-        _raise_for_google_error(response)
+        logger.info("TavilySearchSource: querying Tavily - %s", search_query)
+        response = self._session.post(
+            _TAVILY_SEARCH_URL,
+            json=payload,
+            headers=headers,
+            timeout=_REQUEST_TIMEOUT,
+        )
+        _raise_for_tavily_error(response)
 
         data: dict[str, Any] = response.json()
-        items = data.get("items") or []
+        items = data.get("results") or []
 
         jobs: list[NormalizedJob] = []
         skipped = 0
@@ -144,16 +163,19 @@ class GoogleSearchSource(JobSource):
 
         if not jobs:
             logger.warning(
-                "GoogleSearchSource returned 0 jobs for '%s' in '%s'.",
+                "TavilySearchSource returned 0 jobs for '%s' in '%s'.",
                 ui_query,
                 ui_location,
             )
 
+        usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
         return jobs, {
             "search_query": search_query,
-            "total_results": (data.get("searchInformation") or {}).get("totalResults"),
             "fetched_count": len(jobs),
             "skipped_count": skipped,
+            "response_time": data.get("response_time"),
+            "request_id": data.get("request_id"),
+            "credits": usage.get("credits"),
         }
 
     def _normalize_job(
@@ -163,18 +185,13 @@ class GoogleSearchSource(JobSource):
         ui_query: str = "",
         ui_location: str = "",
     ) -> NormalizedJob | None:
-        apply_url = as_text(item.get("link"))
-        if not apply_url:
+        apply_url = as_text(item.get("url"))
+        if not apply_url or not _is_known_ats_url(apply_url):
             return None
 
         title = as_text(item.get("title")) or "Unknown Title"
-        # snippet is the primary content — Gemini will score from this
-        snippet = as_text(item.get("snippet")) or title
-        company = (
-            _extract_company_from_pagemap(item)
-            or _extract_company_from_url(apply_url)
-            or "Direct ATS"
-        )
+        content = as_text(item.get("content")) or title
+        company = _extract_company_from_url(apply_url) or "Direct ATS"
         source_job_id = sha256(apply_url.encode()).hexdigest()[:64]
 
         try:
@@ -183,15 +200,16 @@ class GoogleSearchSource(JobSource):
                 source_job_id=source_job_id,
                 company_name=company,
                 title=title,
-                location=None,
-                remote_type=infer_remote_type(snippet),
+                location=ui_location,
+                remote_type=infer_remote_type(content, title),
                 posted_at=None,
                 apply_url=apply_url,
-                description=snippet,
+                description=content,
                 source_metadata={
-                    "display_link": item.get("displayLink", ""),
                     "search_query": ui_query,
                     "search_location": ui_location,
+                    "score": item.get("score"),
+                    "provider": "tavily",
                 },
                 raw_payload=item,
             )
@@ -199,27 +217,60 @@ class GoogleSearchSource(JobSource):
             return None
 
 
-def _extract_company_from_pagemap(item: dict[str, Any]) -> str | None:
-    pagemap = item.get("pagemap")
-    if not isinstance(pagemap, dict):
-        return None
-    for org in pagemap.get("organization") or []:
-        if isinstance(org, dict):
-            name = org.get("name") or org.get("legalname")
-            if name:
-                return as_text(name)
-    for meta in pagemap.get("metatags") or []:
-        if not isinstance(meta, dict):
-            continue
-        for key in ("og:site_name", "application-name", "twitter:site"):
-            name = meta.get(key)
-            if name:
-                return as_text(name)
+def _raise_for_tavily_error(response: requests.Response) -> None:
+    if 200 <= response.status_code < 300:
+        return
+
+    message = ""
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = {}
+    if isinstance(payload, dict):
+        detail = payload.get("detail") or payload.get("error") or payload.get("message")
+        message = as_text(detail)
+
+    if response.status_code in (401, 403):
+        detail = message or "Tavily rejected the API key."
+        raise TavilyProviderError(
+            f"Tavily Search authorization failed. {detail} "
+            "Check TAVILY_API_KEY and restart the backend."
+        )
+
+    if response.status_code in (429, 432, 433):
+        detail = message or "Tavily quota or rate limit was reached."
+        raise TavilyProviderError(
+            f"Tavily Search quota/rate limit reached. {detail} "
+            "Wait for quota reset or upgrade the Tavily plan."
+        )
+
+    detail = f" {message}" if message else ""
+    raise TavilyProviderError(f"Tavily Search request failed with HTTP {response.status_code}.{detail}")
+
+
+def _country_from_location(location: str) -> str | None:
+    normalized = location.casefold()
+    if "india" in normalized:
+        return "india"
+    if "united states" in normalized or "usa" in normalized:
+        return "united states"
+    if "united kingdom" in normalized or "uk" in normalized:
+        return "united kingdom"
+    if "germany" in normalized:
+        return "germany"
+    if "singapore" in normalized:
+        return "singapore"
+    if "canada" in normalized:
+        return "canada"
     return None
 
 
+def _is_known_ats_url(url: str) -> bool:
+    hostname = urlparse(url).hostname or ""
+    return any(hostname == domain or hostname.endswith(f".{domain}") for domain in _ATS_DOMAINS)
+
+
 def _extract_company_from_url(url: str) -> str | None:
-    """Parse the company slug from known ATS URL structures."""
     try:
         parsed = urlparse(url)
         hostname = parsed.hostname or ""
@@ -249,58 +300,6 @@ def _normalize_text(value: str | None, default: str) -> str:
         return default
     stripped = value.strip()
     return stripped or default
-
-
-def _raise_for_google_error(response: requests.Response) -> None:
-    if 200 <= response.status_code < 300:
-        return
-
-    message = ""
-    reason = ""
-    status = ""
-    try:
-        payload = response.json()
-    except ValueError:
-        payload = {}
-
-    if isinstance(payload, dict):
-        error = payload.get("error")
-        if isinstance(error, dict):
-            message = as_text(error.get("message"))
-            status = as_text(error.get("status"))
-            errors = error.get("errors")
-            if isinstance(errors, list) and errors and isinstance(errors[0], dict):
-                reason = as_text(errors[0].get("reason"))
-
-    if response.status_code == 403:
-        detail = message or "Google returned permission denied."
-        raise GoogleSearchProviderError(
-            "Google Custom Search denied the request. "
-            f"{detail} "
-            "Use a Google Cloud project that has access to Custom Search JSON API, "
-            "enable the API for that project, check billing/quota, and ensure API key "
-            "restrictions allow backend server requests."
-        )
-
-    if response.status_code == 400:
-        detail = message or "Google rejected the search request."
-        raise GoogleSearchProviderError(
-            f"Google Custom Search rejected the request. {detail} "
-            "Check GOOGLE_SEARCH_ENGINE_ID and the Programmable Search Engine configuration."
-        )
-
-    if response.status_code == 429:
-        detail = message or "Quota exceeded."
-        raise GoogleSearchProviderError(
-            f"Google Custom Search quota/rate limit reached. {detail} "
-            "Wait for quota reset or increase quota in Google Cloud."
-        )
-
-    provider_bits = ", ".join(bit for bit in (status, reason, message) if bit)
-    suffix = f": {provider_bits}" if provider_bits else "."
-    raise GoogleSearchProviderError(
-        f"Google Custom Search request failed with HTTP {response.status_code}{suffix}"
-    )
 
 
 def _state_from_values(

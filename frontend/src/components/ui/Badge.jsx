@@ -46,6 +46,7 @@ export function StatusBadge({ status }) {
 export function SourceBadge({ source }) {
   const sourceColors = {
     google_search: 'teal',
+    tavily_search: 'teal',
     manual: 'gray',
     smartrecruiters: 'violet',
   }

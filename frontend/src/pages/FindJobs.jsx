@@ -11,7 +11,7 @@ import {
   Sparkles,
   Zap,
 } from 'lucide-react'
-import { importGoogleSearch, listSourceRuns } from '../api/sources'
+import { importWebSearch, listSourceRuns } from '../api/sources'
 import { getWorkflowRun, listWorkflows } from '../api/workflows'
 import { createManualJob } from '../api/jobs'
 import { scoreJobs } from '../api/profiles'
@@ -24,7 +24,7 @@ import EmptyState from '../components/ui/EmptyState'
 import Badge from '../components/ui/Badge'
 import { PageSpinner } from '../components/ui/Spinner'
 
-const SOURCE_COLORS = { google_search: 'teal' }
+const SOURCE_COLORS = { google_search: 'teal', tavily_search: 'teal' }
 const ACTIVE_IMPORT_STATUSES = new Set(['pending', 'running'])
 const TERMINAL_WORKFLOW_STATUSES = new Set(['completed', 'completed_with_errors', 'failed'])
 const SCORE_BATCH_LIMIT = 10
@@ -142,7 +142,7 @@ export default function FindJobs() {
   }, [])
 
   const webSearchMut = useMutation({
-    mutationFn: importGoogleSearch,
+    mutationFn: importWebSearch,
     onSuccess: (data) => {
       ignoredImportRunIdsRef.current.delete(data.run_id)
       setActiveImportRunId(data.run_id)
@@ -158,7 +158,7 @@ export default function FindJobs() {
 
     const activeGoogleWorkflow = workflowsQ.data?.items?.find((workflow) => {
       return (
-        workflow.source_name === 'google_search' &&
+        (workflow.source_name === 'tavily_search' || workflow.source_name === 'google_search') &&
         ACTIVE_IMPORT_STATUSES.has(workflow.status) &&
         workflow.run_id &&
         !ignoredImportRunIdsRef.current.has(workflow.run_id)
@@ -176,7 +176,7 @@ export default function FindJobs() {
     }
 
     if (importRunQ.data.status === 'completed') {
-      onImportSuccess(getGoogleSearchImportSummary(importRunQ.data), 'Google Search')
+      onImportSuccess(getWebSearchImportSummary(importRunQ.data), 'Web Search')
       ignoredImportRunIdsRef.current.add(activeImportRunId)
       setActiveImportRunId(null)
       return
@@ -439,8 +439,10 @@ export default function FindJobs() {
   )
 }
 
-function getGoogleSearchImportSummary(workflowRun) {
-  const sourceResult = workflowRun.state?.source_results?.find((result) => result.source_name === 'google_search') ?? {}
+function getWebSearchImportSummary(workflowRun) {
+  const sourceResult = workflowRun.state?.source_results?.find((result) => (
+    result.source_name === 'tavily_search' || result.source_name === 'google_search'
+  )) ?? {}
   return {
     jobs_fetched: Number(sourceResult.jobs_fetched ?? 0),
     jobs_stored: Number(sourceResult.jobs_stored ?? 0),

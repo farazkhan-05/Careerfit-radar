@@ -36,7 +36,7 @@ class ManualJobCreate(BaseModel):
     description: str = Field(min_length=1)
 
 
-class GoogleSearchImportRequest(BaseModel):
+class WebSearchImportRequest(BaseModel):
     query: str = Field(default="Front End Developer", min_length=1, max_length=255)
     location: str = Field(default="Lucknow, India", min_length=1, max_length=255)
 
@@ -47,6 +47,9 @@ class GoogleSearchImportRequest(BaseModel):
         if not normalized:
             raise ValueError("Value must not be blank.")
         return normalized
+
+
+GoogleSearchImportRequest = WebSearchImportRequest
 
 
 class SourceImportResponse(BaseModel):

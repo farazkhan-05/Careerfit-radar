@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     database_url: str = Field(..., alias="DATABASE_URL")
     gemini_api_key: str = Field(..., alias="GEMINI_API_KEY")
+    tavily_api_key: str = Field(default="", alias="TAVILY_API_KEY")
     google_search_api_key: str = Field(default="", alias="GOOGLE_SEARCH_API_KEY")
     google_search_engine_id: str = Field(default="", alias="GOOGLE_SEARCH_ENGINE_ID")
     gemini_embedding_model: str = Field(

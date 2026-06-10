@@ -259,7 +259,8 @@ export default function Jobs() {
               </Select>
               <Select label="Source" value={source} onChange={(e) => { setSource(e.target.value); setOffset(0) }}>
                 <option value="">All sources</option>
-                <option value="google_search">Google Search</option>
+                <option value="tavily_search">Web Search</option>
+                <option value="google_search">Google Search (legacy)</option>
                 <option value="manual">Manual</option>
               </Select>
               <button

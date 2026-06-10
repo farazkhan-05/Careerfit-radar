@@ -1,11 +1,11 @@
 import apiClient from './client'
 
-export async function importGoogleSearch({ query, location } = {}) {
+export async function importWebSearch({ query, location } = {}) {
   const payload = {
     query: typeof query === 'string' ? query.trim() : undefined,
     location: typeof location === 'string' ? location.trim() : undefined,
   }
-  const { data } = await apiClient.post('/sources/import/google-search', payload)
+  const { data } = await apiClient.post('/sources/import/web-search', payload)
   return data
 }
 
