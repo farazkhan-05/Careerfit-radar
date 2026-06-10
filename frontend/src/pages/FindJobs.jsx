@@ -324,12 +324,12 @@ export default function FindJobs() {
                 )}
               </div>
 
-              <div className="ticket-edge border-t border-ink/10 bg-ink p-5 text-white lg:border-l lg:border-t-0">
-                <div className="subtle-bob grid h-14 w-14 place-items-center rounded-lg bg-white text-ink">
+              <div className="ink-surface ticket-edge border-t p-5 lg:border-l lg:border-t-0">
+                <div className="ink-icon-tile subtle-bob grid h-14 w-14 place-items-center rounded-lg">
                   <Search className="h-7 w-7" />
                 </div>
                 <p className="mt-5 font-display text-2xl font-bold leading-tight">Sweep first, sort second.</p>
-                <p className="mt-2 text-sm font-medium leading-6 text-white/65">
+                <p className="ink-muted mt-2 text-sm font-medium leading-6">
                   Imported jobs stay separate until scoring, so you can review the pipeline calmly.
                 </p>
               </div>

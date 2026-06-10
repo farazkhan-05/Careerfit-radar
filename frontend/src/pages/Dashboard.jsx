@@ -128,18 +128,16 @@ function NextAction({ resumes, jobs, applications }) {
   }
 
   return (
-    <section className="relative overflow-hidden rounded-lg border border-ink bg-ink p-5 text-white shadow-[8px_8px_0_rgba(247,201,72,0.45)]">
-      <div className="absolute bottom-0 left-0 h-2 w-1/3 bg-mint" />
-      <div className="absolute bottom-0 left-1/3 h-2 w-1/3 bg-sun" />
-      <div className="absolute bottom-0 right-0 h-2 w-1/3 bg-coral" />
+    <section className="ink-surface relative overflow-hidden rounded-lg border p-5 shadow-[8px_8px_0_rgba(247,201,72,0.45)]">
+      <div className="action-strip absolute bottom-0 left-0 h-2 w-full" />
 
       <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-4">
-          <div className="grid h-12 w-12 flex-shrink-0 place-items-center rounded-lg bg-white text-ink">
+          <div className="ink-icon-tile grid h-12 w-12 flex-shrink-0 place-items-center rounded-lg">
             <Icon className="h-6 w-6" />
           </div>
           <div>
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-white/55">Next move</p>
+            <p className="ink-soft text-[10px] font-extrabold uppercase tracking-[0.2em]">Next move</p>
             <p className="mt-1 max-w-xl font-display text-2xl font-bold leading-tight text-balance">{message}</p>
           </div>
         </div>

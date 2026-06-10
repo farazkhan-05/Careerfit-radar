@@ -230,7 +230,7 @@ export default function Applications() {
                   onClick={() => setStatusFilter(statusFilter === statusName ? '' : statusName)}
                   className={`rounded-lg border px-3 py-2 text-xs font-extrabold transition-all duration-150 hover:-translate-y-0.5 hover:shadow-button ${
                     statusFilter === statusName
-                      ? 'border-ink bg-ink text-white'
+                      ? 'ink-surface'
                       : 'border-ink/10 bg-white text-muted hover:border-ink hover:text-ink'
                   }`}
                 >

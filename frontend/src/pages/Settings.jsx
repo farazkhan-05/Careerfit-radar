@@ -83,7 +83,7 @@ export default function Settings() {
               <Server className="h-4 w-4" />
               Endpoint
             </div>
-            <code className="block overflow-x-auto rounded-lg bg-ink px-3 py-2 font-mono text-sm font-semibold text-white">
+            <code className="ink-surface block overflow-x-auto rounded-lg px-3 py-2 font-mono text-sm font-semibold">
               {apiUrl}
             </code>
             <p className="mt-2 text-xs font-medium leading-5 text-muted">

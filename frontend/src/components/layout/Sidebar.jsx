@@ -15,7 +15,7 @@ const navItems = [
   { to: '/find-jobs', icon: Search, label: 'Find Jobs', accent: 'bg-sky' },
   { to: '/jobs', icon: Briefcase, label: 'Matches', accent: 'bg-plum' },
   { to: '/applications', icon: ClipboardList, label: 'Applications', accent: 'bg-coral' },
-  { to: '/settings', icon: Settings, label: 'Settings', accent: 'bg-ink' },
+  { to: '/settings', icon: Settings, label: 'Settings', accent: 'bg-white' },
 ]
 
 export default function Sidebar() {
@@ -46,7 +46,7 @@ export default function Sidebar() {
               className={({ isActive }) =>
                 `group relative flex min-w-fit items-center gap-2.5 rounded-lg border px-3 py-2.5 text-sm font-bold transition-all duration-150 lg:min-w-0 ${
                   isActive
-                    ? 'border-ink bg-ink text-white shadow-[4px_4px_0_rgba(83,208,162,0.45)]'
+                    ? 'nav-link-active'
                     : 'border-transparent text-muted hover:-translate-y-0.5 hover:border-ink/10 hover:bg-white hover:text-ink hover:shadow-[3px_3px_0_rgba(24,33,47,0.10)]'
                 }`
               }
