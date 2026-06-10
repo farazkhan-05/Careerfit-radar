@@ -1,12 +1,15 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import AppShell from './components/layout/AppShell'
-import Dashboard from './pages/Dashboard'
-import Resume from './pages/Resume'
-import FindJobs from './pages/FindJobs'
-import Jobs from './pages/Jobs'
-import Applications from './pages/Applications'
-import Settings from './pages/Settings'
+import { PageSpinner } from './components/ui/Spinner'
+
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Resume = lazy(() => import('./pages/Resume'))
+const FindJobs = lazy(() => import('./pages/FindJobs'))
+const Jobs = lazy(() => import('./pages/Jobs'))
+const Applications = lazy(() => import('./pages/Applications'))
+const Settings = lazy(() => import('./pages/Settings'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,16 +28,18 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <Routes>
-          <Route element={<AppShell />}>
-            <Route index element={<Dashboard />} />
-            <Route path="resume" element={<Resume />} />
-            <Route path="find-jobs" element={<FindJobs />} />
-            <Route path="jobs" element={<Jobs />} />
-            <Route path="applications" element={<Applications />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
-        </Routes>
+        <Suspense fallback={<PageSpinner />}>
+          <Routes>
+            <Route element={<AppShell />}>
+              <Route index element={<Dashboard />} />
+              <Route path="resume" element={<Resume />} />
+              <Route path="find-jobs" element={<FindJobs />} />
+              <Route path="jobs" element={<Jobs />} />
+              <Route path="applications" element={<Applications />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </QueryClientProvider>
   )

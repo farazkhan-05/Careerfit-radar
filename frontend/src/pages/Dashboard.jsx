@@ -18,10 +18,9 @@ import { listApplications } from '../api/applications'
 import { listWorkflows } from '../api/workflows'
 import { Card } from '../components/ui/Card'
 import { SourceBadge, StatusBadge } from '../components/ui/Badge'
-import { PageSpinner } from '../components/ui/Spinner'
 import Button from '../components/ui/Button'
 
-function MetricCard({ icon: Icon, label, value, accent, linkTo }) {
+function MetricCard({ icon: Icon, label, value, accent, linkTo, loading = false }) {
   const inner = (
     <Card
       accent={accent}
@@ -38,7 +37,9 @@ function MetricCard({ icon: Icon, label, value, accent, linkTo }) {
           <ArrowRight className="mt-1 h-4 w-4 text-muted transition-transform group-hover:translate-x-1 group-hover:text-ink" />
         )}
       </div>
-      <div className="mt-5 font-display text-3xl font-bold leading-none text-ink">{value}</div>
+      <div className="mt-5 font-display text-3xl font-bold leading-none text-ink">
+        {loading ? <span className="inline-block h-8 w-12 animate-pulse rounded bg-ink/10" /> : value}
+      </div>
       <div className="mt-1 text-sm font-bold text-muted">{label}</div>
     </Card>
   )
@@ -102,10 +103,15 @@ function StepGuide({ resumes, jobs, applications }) {
   )
 }
 
-function NextAction({ resumes, jobs, applications }) {
+function NextAction({ resumes, jobs, applications, loading }) {
   let message, to, cta, Icon
 
-  if (!resumes.length) {
+  if (loading) {
+    message = 'Loading your workspace.'
+    to = null
+    cta = 'Please wait'
+    Icon = Radar
+  } else if (!resumes.length) {
     message = 'Upload your resume to turn it into a matching profile.'
     to = '/resume'
     cta = 'Upload resume'
@@ -141,12 +147,18 @@ function NextAction({ resumes, jobs, applications }) {
             <p className="mt-1 max-w-xl font-display text-2xl font-bold leading-tight text-balance">{message}</p>
           </div>
         </div>
-        <Link to={to} className="flex-shrink-0">
-          <Button variant="sun">
+        {to ? (
+          <Link to={to} className="flex-shrink-0">
+            <Button variant="sun">
+              {cta}
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
+        ) : (
+          <Button variant="sun" disabled className="flex-shrink-0">
             {cta}
-            <ArrowRight className="h-4 w-4" />
           </Button>
-        </Link>
+        )}
       </div>
     </section>
   )
@@ -193,9 +205,7 @@ export default function Dashboard() {
   const savedCount = applications.filter((a) => a.status === 'saved').length
   const workflowCount = workflowsQ.data?.total ?? 0
 
-  const isLoading = resumesQ.isLoading || jobsQ.isLoading || appsQ.isLoading
-
-  if (isLoading) return <PageSpinner />
+  const isLoading = resumesQ.isLoading || jobsQ.isLoading || appsQ.isLoading || workflowsQ.isLoading
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
@@ -211,13 +221,13 @@ export default function Dashboard() {
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)]">
         <div className="space-y-5">
-          <NextAction resumes={resumes} jobs={jobs} applications={applications} />
+          <NextAction resumes={resumes} jobs={jobs} applications={applications} loading={isLoading} />
 
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <MetricCard icon={FileText} label="Resumes" value={resumesQ.data?.total ?? 0} accent="#f7c948" linkTo="/resume" />
-            <MetricCard icon={Briefcase} label="Jobs found" value={jobsQ.data?.total ?? 0} accent="#67b7f7" linkTo="/jobs" />
-            <MetricCard icon={BookmarkCheck} label="Saved" value={savedCount} accent="#53d0a2" linkTo="/applications" />
-            <MetricCard icon={Zap} label="Runs" value={workflowCount} accent="#f97066" linkTo="/find-jobs" />
+            <MetricCard icon={FileText} label="Resumes" value={resumesQ.data?.total ?? 0} accent="#f7c948" linkTo="/resume" loading={resumesQ.isLoading} />
+            <MetricCard icon={Briefcase} label="Jobs found" value={jobsQ.data?.total ?? 0} accent="#67b7f7" linkTo="/jobs" loading={jobsQ.isLoading} />
+            <MetricCard icon={BookmarkCheck} label="Saved" value={savedCount} accent="#53d0a2" linkTo="/applications" loading={appsQ.isLoading} />
+            <MetricCard icon={Zap} label="Runs" value={workflowCount} accent="#f97066" linkTo="/find-jobs" loading={workflowsQ.isLoading} />
           </div>
         </div>
 
@@ -235,7 +245,13 @@ export default function Dashboard() {
               View all
             </Link>
           </div>
-          {jobs.length === 0 ? (
+          {jobsQ.isLoading ? (
+            <div className="space-y-3">
+              {[0, 1, 2].map((item) => (
+                <div key={item} className="h-16 animate-pulse rounded-lg border border-ink/10 bg-white/70" />
+              ))}
+            </div>
+          ) : jobs.length === 0 ? (
             <div className="rounded-lg border border-dashed border-ink/15 bg-white/70 px-5 py-8 text-center">
               <Search className="mx-auto h-7 w-7 text-muted" />
               <p className="mt-2 text-sm font-bold text-muted">No jobs imported yet.</p>
