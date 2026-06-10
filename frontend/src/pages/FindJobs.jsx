@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, ChevronUp, Plus, Sparkles, Zap } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronUp,
+  Clock3,
+  History,
+  ListChecks,
+  Plus,
+  Search,
+  Sparkles,
+  Zap,
+} from 'lucide-react'
 import { importGoogleSearch, listSourceRuns } from '../api/sources'
 import { getWorkflowRun, listWorkflows } from '../api/workflows'
 import { createManualJob } from '../api/jobs'
@@ -19,17 +29,21 @@ const ACTIVE_IMPORT_STATUSES = new Set(['pending', 'running'])
 const TERMINAL_WORKFLOW_STATUSES = new Set(['completed', 'completed_with_errors', 'failed'])
 const SCORE_BATCH_LIMIT = 10
 
-function StepIndicator({ number, active }) {
+function FlowStep({ number, title, description, accent, active = true }) {
   return (
-    <div
-      className={`h-7 w-7 rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0 transition-all ${
-        active
-          ? 'text-white shadow-md'
-          : 'bg-slate-200 text-slate-500'
-      }`}
-      style={active ? { background: 'linear-gradient(135deg, #6366F1, #4338ca)', boxShadow: '0 4px 10px rgba(99,102,241,0.35)' } : {}}
-    >
-      {number}
+    <div className="flex gap-3">
+      <div
+        className={`grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg border text-sm font-extrabold ${
+          active ? 'border-ink text-ink shadow-[3px_3px_0_rgba(24,33,47,0.12)]' : 'border-ink/10 text-muted'
+        }`}
+        style={{ backgroundColor: active ? accent : 'white' }}
+      >
+        {number}
+      </div>
+      <div>
+        <div className="text-sm font-bold text-ink">{title}</div>
+        <p className="mt-0.5 text-xs font-medium leading-5 text-muted">{description}</p>
+      </div>
     </div>
   )
 }
@@ -37,33 +51,38 @@ function StepIndicator({ number, active }) {
 function RunsTable({ runs }) {
   if (runs.length === 0) {
     return (
-      <EmptyState icon="list" title="No imports yet" description="Search the web to import ATS jobs." />
+      <EmptyState
+        icon={History}
+        title="No imports yet"
+        description="Search ATS boards and your import runs will land here."
+      />
     )
   }
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-100">
-            <th className="text-left py-2 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Source</th>
-            <th className="text-left py-2 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Status</th>
-            <th className="text-right py-2 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Fetched</th>
-            <th className="text-right py-2 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Stored</th>
+          <tr className="border-b border-ink/10">
+            <th className="px-3 py-2 text-left text-[10px] font-extrabold uppercase tracking-[0.16em] text-muted">Source</th>
+            <th className="px-3 py-2 text-left text-[10px] font-extrabold uppercase tracking-[0.16em] text-muted">Status</th>
+            <th className="px-3 py-2 text-right text-[10px] font-extrabold uppercase tracking-[0.16em] text-muted">Fetched</th>
+            <th className="px-3 py-2 text-right text-[10px] font-extrabold uppercase tracking-[0.16em] text-muted">Stored</th>
           </tr>
         </thead>
         <tbody>
           {runs.map((run) => (
-            <tr key={run.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-              <td className="py-2.5 px-3">
+            <tr key={run.id} className="border-b border-ink/5 last:border-0 hover:bg-white/70">
+              <td className="px-3 py-3">
                 <Badge color={SOURCE_COLORS[run.source_name] ?? 'gray'}>{run.source_name}</Badge>
               </td>
-              <td className="py-2.5 px-3">
-                <span className={`text-xs font-semibold ${run.status === 'success' ? 'text-emerald-600' : 'text-rose-500'}`}>
+              <td className="px-3 py-3">
+                <span className={`text-xs font-extrabold ${run.status === 'success' ? 'text-brand-700' : 'text-rose-600'}`}>
                   {run.status}
                 </span>
               </td>
-              <td className="py-2.5 px-3 text-right text-slate-500">{run.jobs_fetched}</td>
-              <td className="py-2.5 px-3 text-right font-bold text-slate-700">{run.jobs_stored}</td>
+              <td className="px-3 py-3 text-right font-semibold text-muted">{run.jobs_fetched}</td>
+              <td className="px-3 py-3 text-right font-display text-lg font-bold text-ink">{run.jobs_stored}</td>
             </tr>
           ))}
         </tbody>
@@ -209,9 +228,9 @@ export default function FindJobs() {
 
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
       if (totalScored === 0) {
-        setScoreMsg({ type: 'success', message: 'All jobs already scored. Go to Job Matches to see results.' })
+        setScoreMsg({ type: 'success', message: 'All jobs already scored. Job Matches is ready.' })
       } else {
-        setScoreMsg({ type: 'success', message: `Scored ${totalScored} jobs against your profile. Go to Job Matches to see results sorted by fit.` })
+        setScoreMsg({ type: 'success', message: `Scored ${totalScored} jobs against your profile.` })
       }
     } catch (err) {
       if (!mountedRef.current || scoreRunRef.current !== runToken) {
@@ -242,143 +261,180 @@ export default function FindJobs() {
   const runs = runsQ.data?.items ?? []
 
   return (
-    <div className="p-8 max-w-3xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-800">Find Jobs</h1>
-        <p className="text-slate-400 mt-1 font-medium">Import jobs, then score them against your resume with AI</p>
-      </div>
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <header className="mb-6 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+        <div>
+          <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-muted">Source lab</p>
+          <h1 className="mt-1 font-display text-4xl font-bold leading-tight text-ink">Find jobs</h1>
+          <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-muted">
+            Pull in roles, score them, and keep the manual saves from getting lost.
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-2 rounded-lg border border-ink/10 bg-white p-2">
+          <FlowStep number="1" title="Import" description="ATS sweep" accent="#67b7f7" />
+          <FlowStep number="2" title="Score" description="Profile fit" accent="#f7c948" active={Boolean(profile)} />
+          <FlowStep number="3" title="Capture" description="Manual leads" accent="#53d0a2" active={false} />
+        </div>
+      </header>
 
-      <div className="flex items-center gap-3 mb-4">
-        <StepIndicator number="1" active />
-        <h2 className="text-base font-semibold text-slate-700">Import jobs</h2>
-      </div>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="space-y-5">
+          <Card accent="var(--sky)" className="p-0">
+            <div className="grid gap-0 lg:grid-cols-[1fr_250px]">
+              <div className="p-5">
+                <CardHeader
+                  eyebrow="ATS sweep"
+                  title="Direct web search"
+                  subtitle="Greenhouse, Lever, Workday, Ashby, and iCIMS sources."
+                  action={<Badge color="blue">Live import</Badge>}
+                />
 
-      {importMsg?.type === 'success' && <SuccessMessage message={importMsg.message} className="mb-4" />}
-      {importMsg?.type === 'error' && <ErrorMessage message={importMsg.message} className="mb-4" />}
+                {importMsg?.type === 'success' && <SuccessMessage message={importMsg.message} className="mb-4" />}
+                {importMsg?.type === 'error' && <ErrorMessage message={importMsg.message} className="mb-4" />}
 
-      <Card className="mb-6">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="text-sm font-semibold text-slate-700">
-                Direct Web Search{' '}
-                <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full ml-1">
-                  ATS Boards
-                </span>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_0.75fr_auto] sm:items-end">
+                  <Input
+                    label="Role"
+                    value={webSearch.query}
+                    onChange={(e) => setWebSearch((s) => ({ ...s, query: e.target.value }))}
+                    disabled={webSearchMut.isPending || isImportPolling}
+                  />
+                  <Input
+                    label="Location"
+                    value={webSearch.location}
+                    onChange={(e) => setWebSearch((s) => ({ ...s, location: e.target.value }))}
+                    disabled={webSearchMut.isPending || isImportPolling}
+                  />
+                  <Button
+                    variant="sun"
+                    loading={webSearchMut.isPending || isImportPolling}
+                    disabled={isImportPolling || !webSearch.query.trim() || !webSearch.location.trim()}
+                    onClick={() => { setImportMsg(null); webSearchMut.mutate(webSearch) }}
+                  >
+                    <Search className="h-4 w-4" />
+                    Search
+                  </Button>
+                </div>
+
+                {isImportPolling && (
+                  <div className="mt-4 flex items-center gap-2 rounded-lg border border-sun/40 bg-sun/20 px-4 py-3 text-sm font-bold text-amber-900">
+                    <Clock3 className="h-4 w-4" />
+                    Searching ATS boards. This may take a few seconds.
+                  </div>
+                )}
               </div>
-              <div className="text-xs text-slate-400 mt-0.5">Searches Greenhouse, Lever, Workday, Ashby &amp; iCIMS directly</div>
-            </div>
-            <Button
-              loading={webSearchMut.isPending || isImportPolling}
-              disabled={isImportPolling || !webSearch.query.trim() || !webSearch.location.trim()}
-              onClick={() => { setImportMsg(null); webSearchMut.mutate(webSearch) }}
-            >
-              Search
-            </Button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input
-              label="Search Query"
-              value={webSearch.query}
-              onChange={(e) => setWebSearch((s) => ({ ...s, query: e.target.value }))}
-              disabled={webSearchMut.isPending || isImportPolling}
-            />
-            <Input
-              label="Location"
-              value={webSearch.location}
-              onChange={(e) => setWebSearch((s) => ({ ...s, location: e.target.value }))}
-              disabled={webSearchMut.isPending || isImportPolling}
-            />
-          </div>
-          {isImportPolling && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 font-medium">
-              Searching ATS boards... this may take a few seconds
-            </div>
-          )}
-        </div>
-      </Card>
 
-      <div className="flex items-center gap-3 mb-4">
-        <StepIndicator number="2" active />
-        <h2 className="text-base font-semibold text-slate-700">Score jobs against your profile</h2>
-      </div>
+              <div className="ticket-edge border-t border-ink/10 bg-ink p-5 text-white lg:border-l lg:border-t-0">
+                <div className="subtle-bob grid h-14 w-14 place-items-center rounded-lg bg-white text-ink">
+                  <Search className="h-7 w-7" />
+                </div>
+                <p className="mt-5 font-display text-2xl font-bold leading-tight">Sweep first, sort second.</p>
+                <p className="mt-2 text-sm font-medium leading-6 text-white/65">
+                  Imported jobs stay separate until scoring, so you can review the pipeline calmly.
+                </p>
+              </div>
+            </div>
+          </Card>
 
-      <Card className="mb-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Zap className="h-4 w-4 text-amber-500" />
-              <span className="text-sm font-semibold text-slate-700">AI Match Scoring</span>
-              {!profile && (
-                <span className="text-xs text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full font-semibold">Upload resume first</span>
+          <div className="grid gap-5 lg:grid-cols-2">
+            <Card accent="var(--sun)">
+              <div className="flex h-full flex-col">
+                <CardHeader
+                  eyebrow="Fit engine"
+                  title="Score against profile"
+                  subtitle={profile ? 'Your extracted profile is ready.' : 'Upload a resume before scoring.'}
+                  action={<Zap className="h-5 w-5 text-amber-600" />}
+                />
+                <p className="text-sm font-medium leading-6 text-muted">
+                  Match scoring ranks imported roles by skills, experience, and target role alignment.
+                </p>
+                {!profile && (
+                  <div className="mt-4 rounded-lg border border-coral/25 bg-coral/10 px-3 py-2 text-xs font-bold text-rose-700">
+                    Resume profile required.
+                  </div>
+                )}
+                {scoreMsg?.type === 'success' && <SuccessMessage message={scoreMsg.message} className="mt-4" />}
+                {scoreMsg?.type === 'error' && <ErrorMessage message={scoreMsg.message} className="mt-4" />}
+                <div className="mt-auto pt-5">
+                  <Button
+                    onClick={scoreAllJobBatches}
+                    loading={isScoring}
+                    disabled={!profile || isScoring}
+                    className="w-full"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    {isScoring && scoreProgress.remaining !== null
+                      ? `Scoring ${scoreProgress.remaining} left`
+                      : isScoring
+                        ? 'Scoring'
+                        : 'Score jobs'}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
+            <Card accent="var(--mint)">
+              <button
+                className="flex w-full items-start justify-between gap-4 text-left"
+                onClick={() => setShowManual((v) => !v)}
+              >
+                <div>
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-muted">Manual capture</p>
+                  <h2 className="mt-1 font-display text-xl font-bold text-ink">Add a job by hand</h2>
+                  <p className="mt-1 text-sm font-medium leading-6 text-muted">
+                    Paste a promising role from anywhere and send it into matching.
+                  </p>
+                </div>
+                <div className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg border border-ink/10 bg-white text-ink">
+                  {showManual ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                </div>
+              </button>
+
+              {showManual && (
+                <div className="mt-5 space-y-4 border-t border-ink/10 pt-5">
+                  {manualMsg?.type === 'success' && <SuccessMessage message={manualMsg.message} />}
+                  {manualMsg?.type === 'error' && <ErrorMessage message={manualMsg.message} />}
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Input label="Company" placeholder="Acme Corp" value={manualForm.company_name} onChange={(e) => setManualForm((f) => ({ ...f, company_name: e.target.value }))} />
+                    <Input label="Title" placeholder="Software Engineer" value={manualForm.title} onChange={(e) => setManualForm((f) => ({ ...f, title: e.target.value }))} />
+                    <Input label="Apply link" placeholder="https://..." value={manualForm.apply_url} onChange={(e) => setManualForm((f) => ({ ...f, apply_url: e.target.value }))} />
+                    <Input label="Location" placeholder="Remote, Bengaluru, etc." value={manualForm.location} onChange={(e) => setManualForm((f) => ({ ...f, location: e.target.value }))} />
+                    <Select label="Work mode" value={manualForm.remote_type} onChange={(e) => setManualForm((f) => ({ ...f, remote_type: e.target.value }))}>
+                      <option value="">Not specified</option>
+                      <option value="remote">Remote</option>
+                      <option value="hybrid">Hybrid</option>
+                      <option value="onsite">On-site</option>
+                    </Select>
+                  </div>
+                  <Textarea label="Description" placeholder="Paste the job description here..." rows={5} value={manualForm.description} onChange={(e) => setManualForm((f) => ({ ...f, description: e.target.value }))} />
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => { setManualMsg(null); manualMut.mutate() }}
+                      loading={manualMut.isPending}
+                      disabled={!manualForm.company_name || !manualForm.title || !manualForm.apply_url || !manualForm.description}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add job
+                    </Button>
+                  </div>
+                </div>
               )}
-            </div>
-            <p className="text-sm text-slate-400">
-              Scores every imported job against your skills, experience, and target roles. Results appear sorted by fit in Job Matches.
-            </p>
+            </Card>
           </div>
-          <Button
-            onClick={scoreAllJobBatches}
-            loading={isScoring}
-            disabled={!profile || isScoring}
-            className="flex-shrink-0"
-          >
-            <Sparkles className="h-4 w-4" />
-            {isScoring && scoreProgress.remaining !== null
-              ? `Scoring batch... ${scoreProgress.remaining} remaining`
-              : isScoring
-                ? 'Scoring batch...'
-                : 'Score Jobs'}
-          </Button>
         </div>
-        {scoreMsg?.type === 'success' && <SuccessMessage message={scoreMsg.message} className="mt-3" />}
-        {scoreMsg?.type === 'error' && <ErrorMessage message={scoreMsg.message} className="mt-3" />}
-      </Card>
 
-      <div className="flex items-center gap-3 mb-4">
-        <StepIndicator number="3" active={false} />
-        <h2 className="text-base font-semibold text-slate-700">
-          Add a job manually <span className="text-xs font-normal text-slate-400">(optional)</span>
-        </h2>
+        <aside className="xl:sticky xl:top-8 xl:self-start">
+          <Card accent="var(--coral)">
+            <CardHeader
+              eyebrow="History"
+              title="Import runs"
+              subtitle="Last 20 source runs"
+              action={<ListChecks className="h-5 w-5 text-muted" />}
+            />
+            {runsQ.isLoading ? <PageSpinner /> : <RunsTable runs={runs} />}
+          </Card>
+        </aside>
       </div>
-
-      <Card className="mb-6">
-        <button className="flex items-center justify-between w-full text-left" onClick={() => setShowManual(v => !v)}>
-          <div className="flex items-center gap-2">
-            <Plus className="h-4 w-4 text-brand-500" />
-            <span className="text-sm font-semibold text-slate-600">Add a job you found elsewhere</span>
-          </div>
-          {showManual ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
-        </button>
-        {showManual && (
-          <div className="mt-4 space-y-4">
-            {manualMsg?.type === 'success' && <SuccessMessage message={manualMsg.message} />}
-            {manualMsg?.type === 'error' && <ErrorMessage message={manualMsg.message} />}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input label="Company" placeholder="Acme Corp" value={manualForm.company_name} onChange={(e) => setManualForm(f => ({ ...f, company_name: e.target.value }))} />
-              <Input label="Job Title" placeholder="Software Engineer" value={manualForm.title} onChange={(e) => setManualForm(f => ({ ...f, title: e.target.value }))} />
-              <Input label="Apply Link" placeholder="https://..." value={manualForm.apply_url} onChange={(e) => setManualForm(f => ({ ...f, apply_url: e.target.value }))} />
-              <Select label="Work Mode" value={manualForm.remote_type} onChange={(e) => setManualForm(f => ({ ...f, remote_type: e.target.value }))}>
-                <option value="">Not specified</option>
-                <option value="remote">Remote</option>
-                <option value="hybrid">Hybrid</option>
-                <option value="onsite">On-site</option>
-              </Select>
-            </div>
-            <Textarea label="Job Description" placeholder="Paste the job description here..." rows={4} value={manualForm.description} onChange={(e) => setManualForm(f => ({ ...f, description: e.target.value }))} />
-            <div className="flex justify-end">
-              <Button onClick={() => { setManualMsg(null); manualMut.mutate() }} loading={manualMut.isPending} disabled={!manualForm.company_name || !manualForm.title || !manualForm.apply_url || !manualForm.description}>
-                Add Job
-              </Button>
-            </div>
-          </div>
-        )}
-      </Card>
-
-      <Card>
-        <CardHeader title="Import History" subtitle="Last 20 source runs" />
-        {runsQ.isLoading ? <PageSpinner /> : <RunsTable runs={runs} />}
-      </Card>
     </div>
   )
 }

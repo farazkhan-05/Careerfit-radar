@@ -1,6 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { FileText, Briefcase, BookmarkCheck, Zap, ArrowRight, ChevronRight } from 'lucide-react'
+import {
+  ArrowRight,
+  BookmarkCheck,
+  Briefcase,
+  Check,
+  ChevronRight,
+  FileText,
+  ListChecks,
+  Radar,
+  Search,
+  Zap,
+} from 'lucide-react'
 import { listResumes } from '../api/resumes'
 import { listJobs } from '../api/jobs'
 import { listApplications } from '../api/applications'
@@ -10,63 +21,80 @@ import { SourceBadge, StatusBadge } from '../components/ui/Badge'
 import { PageSpinner } from '../components/ui/Spinner'
 import Button from '../components/ui/Button'
 
-function MetricCard({ icon: Icon, label, value, bgColor, iconColor, linkTo }) {
+function MetricCard({ icon: Icon, label, value, accent, linkTo }) {
   const inner = (
-    <Card className="flex items-center gap-4 hover:-translate-y-0.5 transition-transform duration-150">
-      <div
-        className="h-12 w-12 rounded-2xl flex items-center justify-center flex-shrink-0"
-        style={{ backgroundColor: bgColor + '1a' }}
-      >
-        <Icon className="h-5 w-5" style={{ color: iconColor }} />
-      </div>
-      <div>
-        <div className="text-2xl font-bold" style={{ color: '#334155', fontFamily: 'Poppins, sans-serif' }}>
-          {value}
+    <Card
+      accent={accent}
+      className="group h-full transition-all duration-150 hover:-translate-y-1 hover:shadow-[8px_8px_0_rgba(24,33,47,0.10)]"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div
+          className="grid h-11 w-11 place-items-center rounded-lg border border-ink/10 text-ink"
+          style={{ backgroundColor: accent }}
+        >
+          <Icon className="h-5 w-5" />
         </div>
-        <div className="text-sm text-slate-400 font-medium">{label}</div>
+        {linkTo && (
+          <ArrowRight className="mt-1 h-4 w-4 text-muted transition-transform group-hover:translate-x-1 group-hover:text-ink" />
+        )}
       </div>
+      <div className="mt-5 font-display text-3xl font-bold leading-none text-ink">{value}</div>
+      <div className="mt-1 text-sm font-bold text-muted">{label}</div>
     </Card>
   )
+
   if (linkTo) return <Link to={linkTo}>{inner}</Link>
   return inner
 }
 
 function StepGuide({ resumes, jobs, applications }) {
   const steps = [
-    { num: '1', label: 'Upload your resume', done: resumes.length > 0, to: '/resume' },
-    { num: '2', label: 'Import jobs from a source', done: jobs.length > 0, to: '/find-jobs' },
-    { num: '3', label: 'Save jobs you want to track', done: applications.length > 0, to: '/jobs' },
+    { num: '1', label: 'Resume uploaded', done: resumes.length > 0, to: '/resume', icon: FileText },
+    { num: '2', label: 'Jobs imported', done: jobs.length > 0, to: '/find-jobs', icon: Search },
+    { num: '3', label: 'Matches saved', done: applications.length > 0, to: '/jobs', icon: BookmarkCheck },
     {
       num: '4',
-      label: 'Follow up on applications',
+      label: 'Applications moving',
       done: applications.some((a) => a.status === 'applied'),
       to: '/applications',
+      icon: ListChecks,
     },
   ]
 
   return (
-    <Card>
-      <h3 className="text-base font-semibold text-slate-800 mb-4">Getting Started</h3>
-      <div className="space-y-1.5">
+    <Card accent="var(--sky)" className="h-full">
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-muted">Track</p>
+          <h2 className="font-display text-xl font-bold text-ink">Search loop</h2>
+        </div>
+        <div className="grid h-10 w-10 place-items-center rounded-lg bg-sky/20 text-ink">
+          <Radar className="h-5 w-5" />
+        </div>
+      </div>
+
+      <div className="space-y-2">
         {steps.map((step) => (
           <Link
             key={step.num}
             to={step.to}
-            className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group"
+            className="group flex items-center gap-3 rounded-lg border border-transparent px-3 py-3 transition-all hover:-translate-y-0.5 hover:border-ink/10 hover:bg-white"
           >
             <div
-              className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-colors ${
-                step.done
-                  ? 'bg-emerald-500 text-white'
-                  : 'bg-brand-100 text-brand-500 group-hover:bg-brand-500 group-hover:text-white'
+              className={`grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg border text-sm font-extrabold ${
+                step.done ? 'border-brand-500 bg-brand-100 text-brand-800' : 'border-ink/10 bg-white text-muted'
               }`}
             >
-              {step.done ? '✓' : step.num}
+              {step.done ? <Check className="h-4 w-4" /> : step.num}
             </div>
-            <span className={`text-sm flex-1 font-medium ${step.done ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
-              {step.label}
-            </span>
-            <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-brand-500 transition-colors" />
+            <div className="flex-1">
+              <div className={`text-sm font-bold ${step.done ? 'text-ink' : 'text-muted'}`}>{step.label}</div>
+              <div className="text-xs font-medium text-muted">
+                {step.done ? 'Ready' : 'Open task'}
+              </div>
+            </div>
+            <step.icon className="h-4 w-4 text-muted" />
+            <ChevronRight className="h-4 w-4 text-muted transition-transform group-hover:translate-x-1 group-hover:text-ink" />
           </Link>
         ))}
       </div>
@@ -75,59 +103,73 @@ function StepGuide({ resumes, jobs, applications }) {
 }
 
 function NextAction({ resumes, jobs, applications }) {
-  let message, to, cta
+  let message, to, cta, Icon
 
   if (!resumes.length) {
-    message = 'Start by uploading your resume so we can match you to the right jobs.'
+    message = 'Upload your resume to turn it into a matching profile.'
     to = '/resume'
-    cta = 'Upload Resume'
+    cta = 'Upload resume'
+    Icon = FileText
   } else if (!jobs.length) {
-    message = 'Great! Your resume is ready. Import jobs from your favourite sources.'
+    message = 'Bring in fresh openings from ATS job boards.'
     to = '/find-jobs'
-    cta = 'Find Jobs'
+    cta = 'Find jobs'
+    Icon = Search
   } else if (!applications.length) {
-    message = 'Jobs are in. Browse your matches and save the ones worth applying for.'
+    message = 'Review your scored matches and save the strongest leads.'
     to = '/jobs'
-    cta = 'Review Matches'
+    cta = 'Review matches'
+    Icon = Briefcase
   } else {
-    message = 'Keep reviewing new jobs and tracking your application progress.'
+    message = 'Keep your pipeline tidy and follow up at the right time.'
     to = '/applications'
-    cta = 'View Applications'
+    cta = 'Open pipeline'
+    Icon = BookmarkCheck
   }
 
   return (
-    <div
-      className="rounded-2xl p-5 text-white flex items-center justify-between gap-4"
-      style={{ background: 'linear-gradient(135deg, #6366F1 0%, #4338ca 100%)', boxShadow: '0 10px 30px -10px rgba(99,102,241,0.4)' }}
-    >
-      <div>
-        <div className="text-xs font-semibold text-white/60 uppercase tracking-widest mb-1">
-          Your next step
+    <section className="relative overflow-hidden rounded-lg border border-ink bg-ink p-5 text-white shadow-[8px_8px_0_rgba(247,201,72,0.45)]">
+      <div className="absolute bottom-0 left-0 h-2 w-1/3 bg-mint" />
+      <div className="absolute bottom-0 left-1/3 h-2 w-1/3 bg-sun" />
+      <div className="absolute bottom-0 right-0 h-2 w-1/3 bg-coral" />
+
+      <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-4">
+          <div className="grid h-12 w-12 flex-shrink-0 place-items-center rounded-lg bg-white text-ink">
+            <Icon className="h-6 w-6" />
+          </div>
+          <div>
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-white/55">Next move</p>
+            <p className="mt-1 max-w-xl font-display text-2xl font-bold leading-tight text-balance">{message}</p>
+          </div>
         </div>
-        <p className="text-sm text-white/90 font-medium">{message}</p>
+        <Link to={to} className="flex-shrink-0">
+          <Button variant="sun">
+            {cta}
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </Link>
       </div>
-      <Link to={to} className="flex-shrink-0">
-        <button
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold bg-white/20 hover:bg-white/30 text-white border border-white/30 transition-all duration-150 hover:-translate-y-0.5 active:translate-y-0"
-        >
-          {cta}
-          <ArrowRight className="h-3.5 w-3.5" />
-        </button>
-      </Link>
-    </div>
+    </section>
   )
 }
 
 function RecentJobCard({ job }) {
   return (
-    <div className="flex items-start justify-between py-3 border-b border-slate-100 last:border-0 gap-4">
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold text-slate-700 truncate">{job.title}</div>
-        <div className="flex items-center gap-2 mt-1">
+    <div className="grid gap-3 border-b border-ink/10 py-4 last:border-0 sm:grid-cols-[1fr_auto] sm:items-start">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <div className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-lg bg-mint/20 text-xs font-extrabold text-brand-800">
+            {(job.company_name || job.title || '?').charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-bold text-ink">{job.title}</div>
+            <div className="truncate text-xs font-semibold text-muted">{job.company_name || 'Company not listed'}</div>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <SourceBadge source={job.source} />
-          {job.location && (
-            <span className="text-xs text-slate-400 truncate">{job.location}</span>
-          )}
+          {job.location && <span className="text-xs font-semibold text-muted">{job.location}</span>}
         </div>
       </div>
       <StatusBadge status={job.status} />
@@ -153,79 +195,54 @@ export default function Dashboard() {
   const savedCount = applications.filter((a) => a.status === 'saved').length
   const workflowCount = workflowsQ.data?.total ?? 0
 
-  const isLoading = resumesQ.isLoading && jobsQ.isLoading
+  const isLoading = resumesQ.isLoading || jobsQ.isLoading || appsQ.isLoading
 
   if (isLoading) return <PageSpinner />
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
-        <p className="text-slate-400 mt-1 font-medium">Your AI-powered job search workspace</p>
-      </div>
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-muted">Workspace</p>
+          <h1 className="mt-1 font-display text-4xl font-bold leading-tight text-ink">Job search desk</h1>
+        </div>
+        <div className="rounded-lg border border-ink/10 bg-white px-4 py-3 text-sm font-semibold text-muted">
+          <span className="font-bold text-ink">{jobsQ.data?.total ?? 0}</span> openings on the radar
+        </div>
+      </header>
 
-      {/* Next action banner */}
-      <div className="mb-6">
-        <NextAction resumes={resumes} jobs={jobs} applications={applications} />
-      </div>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)]">
+        <div className="space-y-5">
+          <NextAction resumes={resumes} jobs={jobs} applications={applications} />
 
-      {/* Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <MetricCard
-          icon={FileText}
-          label="Resumes"
-          value={resumesQ.data?.total ?? 0}
-          bgColor="#6366F1"
-          iconColor="#6366F1"
-          linkTo="/resume"
-        />
-        <MetricCard
-          icon={Briefcase}
-          label="Jobs Found"
-          value={jobsQ.data?.total ?? 0}
-          bgColor="#8b5cf6"
-          iconColor="#8b5cf6"
-          linkTo="/jobs"
-        />
-        <MetricCard
-          icon={BookmarkCheck}
-          label="Saved"
-          value={savedCount}
-          bgColor="#22C55E"
-          iconColor="#22C55E"
-          linkTo="/applications"
-        />
-        <MetricCard
-          icon={Zap}
-          label="AI Runs"
-          value={workflowCount}
-          bgColor="#f59e0b"
-          iconColor="#f59e0b"
-          linkTo="/find-jobs"
-        />
-      </div>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <MetricCard icon={FileText} label="Resumes" value={resumesQ.data?.total ?? 0} accent="#f7c948" linkTo="/resume" />
+            <MetricCard icon={Briefcase} label="Jobs found" value={jobsQ.data?.total ?? 0} accent="#67b7f7" linkTo="/jobs" />
+            <MetricCard icon={BookmarkCheck} label="Saved" value={savedCount} accent="#53d0a2" linkTo="/applications" />
+            <MetricCard icon={Zap} label="Runs" value={workflowCount} accent="#f97066" linkTo="/find-jobs" />
+          </div>
+        </div>
 
-      {/* Two column: steps + recent jobs */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <StepGuide resumes={resumes} jobs={jobs} applications={applications} />
+      </div>
 
-        <Card>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-base font-semibold text-slate-800">Recent Jobs</h3>
-            <Link
-              to="/jobs"
-              className="text-xs text-brand-500 hover:text-brand-600 font-semibold flex items-center gap-1 transition-colors"
-            >
-              View all <ArrowRight className="h-3 w-3" />
+      <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_0.55fr]">
+        <Card accent="var(--plum)">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-muted">Latest</p>
+              <h2 className="font-display text-xl font-bold text-ink">Recent jobs</h2>
+            </div>
+            <Link to="/jobs" className="text-sm font-bold text-ink hover:underline">
+              View all
             </Link>
           </div>
           {jobs.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="text-3xl mb-2">🔍</div>
-              <p className="text-sm text-slate-400 font-medium">No jobs yet.</p>
-              <Link to="/find-jobs" className="text-xs text-brand-500 hover:underline mt-1 inline-block font-semibold">
-                Import from a source →
+            <div className="rounded-lg border border-dashed border-ink/15 bg-white/70 px-5 py-8 text-center">
+              <Search className="mx-auto h-7 w-7 text-muted" />
+              <p className="mt-2 text-sm font-bold text-muted">No jobs imported yet.</p>
+              <Link to="/find-jobs" className="mt-3 inline-flex">
+                <Button size="sm">Start a search</Button>
               </Link>
             </div>
           ) : (
@@ -235,6 +252,20 @@ export default function Dashboard() {
               ))}
             </div>
           )}
+        </Card>
+
+        <Card accent="var(--sun)" className="bg-white">
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-muted">Rhythm</p>
+          <h2 className="mt-1 font-display text-xl font-bold text-ink">A cleaner pipeline wins</h2>
+          <p className="mt-3 text-sm font-medium leading-6 text-muted">
+            Score imported jobs, save the strongest ones, then keep notes current as each application changes state.
+          </p>
+          <Link to="/applications" className="mt-5 inline-flex">
+            <Button variant="secondary" size="sm">
+              Open applications
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
         </Card>
       </div>
     </div>

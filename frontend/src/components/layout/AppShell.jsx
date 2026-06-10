@@ -3,9 +3,9 @@ import Sidebar from './Sidebar'
 
 export default function AppShell() {
   return (
-    <div className="flex min-h-screen" style={{ backgroundColor: '#F4F7FE' }}>
+    <div className="app-canvas min-h-screen">
       <Sidebar />
-      <main className="flex-1 ml-56 min-h-screen overflow-y-auto">
+      <main className="min-h-screen pt-28 lg:pl-72 lg:pt-0">
         <Outlet />
       </main>
     </div>

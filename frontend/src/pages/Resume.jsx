@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Upload, FileText, Trash2, User, Sparkles } from 'lucide-react'
+import { FileText, Sparkles, Trash2, Upload, User } from 'lucide-react'
 import { listResumes, uploadResume, deleteResume, deleteAllResumes } from '../api/resumes'
 import { listProfiles, deleteProfile, deleteAllProfiles } from '../api/profiles'
 import { Card, CardHeader } from '../components/ui/Card'
@@ -32,10 +32,10 @@ function UploadZone({ onUpload, loading }) {
           handleFiles(e.dataTransfer.files)
         }}
         className={`
-          border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all duration-200
+          group relative cursor-pointer overflow-hidden rounded-lg border-2 border-dashed p-8 text-center transition-all duration-200 sm:p-10
           ${dragging
-            ? 'border-brand-400 bg-brand-50 scale-[1.01]'
-            : 'border-slate-200 hover:border-brand-300 hover:bg-slate-50/50'
+            ? 'border-brand-500 bg-brand-100 shadow-[6px_6px_0_rgba(83,208,162,0.30)]'
+            : 'border-ink/15 bg-white hover:-translate-y-0.5 hover:border-ink hover:shadow-[6px_6px_0_rgba(24,33,47,0.08)]'
           }
         `}
       >
@@ -46,35 +46,27 @@ function UploadZone({ onUpload, loading }) {
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />
-        <div
-          className="h-14 w-14 rounded-2xl flex items-center justify-center mx-auto mb-3"
-          style={{ background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)' }}
-        >
-          <Upload className="h-6 w-6 text-brand-500" />
+        <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-lg border border-ink/10 bg-sun text-ink transition-transform group-hover:-rotate-2">
+          <Upload className="h-7 w-7" />
         </div>
-        <p className="text-sm font-semibold text-slate-700">
-          Drag &amp; drop your resume here, or <span className="text-brand-500">click to browse</span>
-        </p>
-        <p className="text-xs text-slate-400 mt-1 font-medium">PDF or DOCX supported</p>
+        <p className="font-display text-xl font-bold text-ink">Drop your resume here</p>
+        <p className="mt-2 text-sm font-medium text-muted">PDF, DOCX, or TXT. Click the panel to browse.</p>
       </div>
 
-      <div className="flex items-center justify-between">
-        <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-600">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink">
           <input
             type="checkbox"
             checked={extractProfile}
             onChange={(e) => setExtractProfile(e.target.checked)}
-            className="rounded border-slate-300 text-brand-500 focus:ring-brand-400"
+            className="h-4 w-4 rounded border-ink/20 text-brand-500 focus:ring-brand-300"
           />
-          <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-          Extract my profile with AI
+          <Sparkles className="h-4 w-4 text-amber-600" />
+          Extract profile
         </label>
-        <Button
-          onClick={() => fileRef.current?.click()}
-          loading={loading}
-          size="sm"
-        >
-          Upload Resume
+        <Button onClick={() => fileRef.current?.click()} loading={loading}>
+          <Upload className="h-4 w-4" />
+          Upload resume
         </Button>
       </div>
     </div>
@@ -83,14 +75,14 @@ function UploadZone({ onUpload, loading }) {
 
 function ResumeRow({ resume, onDelete, deleting }) {
   return (
-    <div className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
-      <div className="flex items-center gap-3">
-        <div className="h-9 w-9 rounded-xl bg-brand-50 flex items-center justify-center">
-          <FileText className="h-4 w-4 text-brand-500" />
+    <div className="grid gap-3 border-b border-ink/10 py-4 last:border-0 sm:grid-cols-[1fr_auto] sm:items-center">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg bg-sky/20 text-blue-700">
+          <FileText className="h-5 w-5" />
         </div>
-        <div>
-          <div className="text-sm font-semibold text-slate-700">{resume.file_name}</div>
-          <div className="text-xs text-slate-400">{resume.content_type}</div>
+        <div className="min-w-0">
+          <div className="truncate text-sm font-bold text-ink">{resume.file_name}</div>
+          <div className="text-xs font-semibold text-muted">{resume.content_type}</div>
         </div>
       </div>
       <Button
@@ -98,9 +90,10 @@ function ResumeRow({ resume, onDelete, deleting }) {
         size="sm"
         loading={deleting}
         onClick={() => onDelete(resume.id)}
-        className="text-rose-400 hover:text-rose-600 hover:bg-rose-50"
+        className="justify-self-start text-rose-600 hover:bg-coral/10 hover:text-rose-700 sm:justify-self-end"
+        title="Delete resume"
       >
-        <Trash2 className="h-3.5 w-3.5" />
+        <Trash2 className="h-4 w-4" />
       </Button>
     </div>
   )
@@ -115,52 +108,55 @@ function ProfileCard({ profile }) {
   ].filter(Boolean)
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
-        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-          Target Roles
+        <div className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.18em] text-muted">
+          Target roles
         </div>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {(profile.target_roles ?? []).length > 0 ? (
             profile.target_roles.map((role) => (
               <span
                 key={role}
-                className="inline-flex px-3 py-1 rounded-full text-xs bg-brand-100 text-brand-600 font-semibold"
+                className="inline-flex rounded-md border border-brand-500/25 bg-brand-100 px-2.5 py-1 text-xs font-bold text-brand-800"
               >
                 {role}
               </span>
             ))
           ) : (
-            <span className="text-xs text-slate-400 font-medium">Not extracted</span>
+            <span className="text-sm font-medium text-muted">Not extracted</span>
           )}
         </div>
       </div>
 
       {profile.experience_years != null && (
-        <div>
-          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+        <div className="rounded-lg border border-ink/10 bg-white p-4">
+          <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-muted">
             Experience
           </div>
-          <div className="text-sm font-semibold text-slate-700">{profile.experience_years} years</div>
+          <div className="mt-1 font-display text-3xl font-bold text-ink">{profile.experience_years}</div>
+          <div className="text-sm font-bold text-muted">years</div>
         </div>
       )}
 
       {allSkills.length > 0 && (
         <div>
-          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+          <div className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.18em] text-muted">
             Skills
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {allSkills.slice(0, 20).map((skill) => (
               <span
                 key={skill}
-                className="inline-flex px-2.5 py-1 rounded-full text-xs bg-slate-100 text-slate-600 font-medium"
+                className="inline-flex rounded-md border border-ink/10 bg-white px-2.5 py-1 text-xs font-semibold text-muted"
               >
                 {skill}
               </span>
             ))}
             {allSkills.length > 20 && (
-              <span className="text-xs text-slate-400 font-medium">+{allSkills.length - 20} more</span>
+              <span className="inline-flex rounded-md border border-ink/10 bg-sun/20 px-2.5 py-1 text-xs font-bold text-ink">
+                +{allSkills.length - 20} more
+              </span>
             )}
           </div>
         </div>
@@ -223,37 +219,39 @@ export default function Resume() {
   const profiles = profilesQ.data?.items ?? []
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-800">My Resume</h1>
-        <p className="text-slate-400 mt-1 font-medium">Upload your resume and let AI build your candidate profile</p>
-      </div>
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <header className="mb-6">
+        <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-muted">Candidate file</p>
+        <h1 className="mt-1 font-display text-4xl font-bold leading-tight text-ink">Resume and profile</h1>
+        <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-muted">
+          Keep the source document and extracted matching profile in one clean place.
+        </p>
+      </header>
 
-      <div className="space-y-6">
-        {/* Upload */}
-        <Card>
-          <CardHeader title="Upload Resume" subtitle="PDF or DOCX, up to 10MB" />
-          {uploadStatus?.type === 'success' && (
-            <SuccessMessage message={uploadStatus.message} className="mb-4" />
-          )}
-          {uploadStatus?.type === 'error' && (
-            <ErrorMessage message={uploadStatus.message} className="mb-4" />
-          )}
-          <UploadZone
-            loading={uploadMut.isPending}
-            onUpload={(file, extractProfile) => {
-              setUploadStatus(null)
-              uploadMut.mutate({ file, extractProfile })
-            }}
-          />
-        </Card>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="space-y-5">
+          <Card accent="var(--sun)">
+            <CardHeader title="Upload resume" subtitle="PDF, DOCX, or TXT up to 10MB" eyebrow="Input" />
+            {uploadStatus?.type === 'success' && (
+              <SuccessMessage message={uploadStatus.message} className="mb-4" />
+            )}
+            {uploadStatus?.type === 'error' && (
+              <ErrorMessage message={uploadStatus.message} className="mb-4" />
+            )}
+            <UploadZone
+              loading={uploadMut.isPending}
+              onUpload={(file, extractProfile) => {
+                setUploadStatus(null)
+                uploadMut.mutate({ file, extractProfile })
+              }}
+            />
+          </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Uploaded resumes */}
-          <Card>
+          <Card accent="var(--sky)">
             <CardHeader
-              title="Uploaded Resumes"
+              title="Uploaded files"
               subtitle={`${resumes.length} file${resumes.length !== 1 ? 's' : ''}`}
+              eyebrow="Library"
               action={
                 resumes.length > 0 && (
                   <Button
@@ -265,10 +263,10 @@ export default function Resume() {
                         deleteAllResumesMut.mutate()
                       }
                     }}
-                    className="text-rose-500 hover:text-rose-600 hover:bg-rose-50"
+                    className="text-rose-600 hover:bg-coral/10 hover:text-rose-700"
                   >
-                    <Trash2 className="h-3.5 w-3.5 mr-1" />
-                    Delete All
+                    <Trash2 className="h-4 w-4" />
+                    Delete all
                   </Button>
                 )
               }
@@ -277,27 +275,29 @@ export default function Resume() {
               <PageSpinner />
             ) : resumes.length === 0 ? (
               <EmptyState
-                icon="📄"
+                icon={FileText}
                 title="No resumes yet"
-                description="Upload your resume above to get started."
+                description="Upload a resume above to start building your profile."
               />
             ) : (
-              resumes.map((r) => (
+              resumes.map((resume) => (
                 <ResumeRow
-                  key={r.id}
-                  resume={r}
+                  key={resume.id}
+                  resume={resume}
                   onDelete={(id) => deleteMut.mutate(id)}
-                  deleting={deleteMut.isPending && deleteMut.variables === r.id}
+                  deleting={deleteMut.isPending && deleteMut.variables === resume.id}
                 />
               ))
             )}
           </Card>
+        </div>
 
-          {/* Profile */}
-          <Card>
+        <aside className="xl:sticky xl:top-8 xl:self-start">
+          <Card accent="var(--mint)">
             <CardHeader
-              title="Candidate Profile"
-              subtitle="Extracted by AI from your resume"
+              title="Candidate profile"
+              subtitle="Extracted from uploaded resume content"
+              eyebrow="Matching brain"
               action={
                 <div className="flex items-center gap-2">
                   {profiles.length > 0 && (
@@ -310,14 +310,13 @@ export default function Resume() {
                           deleteAllProfilesMut.mutate()
                         }
                       }}
-                      className="text-rose-500 hover:text-rose-600 hover:bg-rose-50"
+                      className="text-rose-600 hover:bg-coral/10 hover:text-rose-700"
                     >
-                      <Trash2 className="h-3.5 w-3.5 mr-1" />
-                      Delete All
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   )}
-                  <div className="h-7 w-7 rounded-full bg-amber-100 flex items-center justify-center">
-                    <User className="h-4 w-4 text-amber-500" />
+                  <div className="grid h-9 w-9 place-items-center rounded-lg bg-mint/20 text-brand-800">
+                    <User className="h-5 w-5" />
                   </div>
                 </div>
               }
@@ -326,29 +325,29 @@ export default function Resume() {
               <PageSpinner />
             ) : profiles.length === 0 ? (
               <EmptyState
-                icon="✨"
+                icon={Sparkles}
                 title="No profile yet"
-                description="Upload a resume with AI extraction enabled."
+                description="Enable extraction while uploading to create one."
               />
             ) : (
-              <div className="space-y-4">
-                {profiles.map((p) => (
-                  <div key={p.id} className="relative">
+              <div className="space-y-6">
+                {profiles.map((profile) => (
+                  <div key={profile.id} className="relative rounded-lg border border-ink/10 bg-white/70 p-4">
                     <button
-                      onClick={() => deleteProfileMut.mutate(p.id)}
-                      disabled={deleteProfileMut.isPending && deleteProfileMut.variables === p.id}
-                      className="absolute top-0 right-0 p-1 text-rose-400 hover:text-rose-600 transition-colors rounded-full hover:bg-rose-50"
+                      onClick={() => deleteProfileMut.mutate(profile.id)}
+                      disabled={deleteProfileMut.isPending && deleteProfileMut.variables === profile.id}
+                      className="absolute right-3 top-3 rounded-lg border border-transparent p-2 text-rose-600 transition-colors hover:border-coral/20 hover:bg-coral/10"
                       title="Delete profile"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-4 w-4" />
                     </button>
-                    <ProfileCard profile={p} />
+                    <ProfileCard profile={profile} />
                   </div>
                 ))}
               </div>
             )}
           </Card>
-        </div>
+        </aside>
       </div>
     </div>
   )

@@ -1,28 +1,121 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Nunito:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --ink: #18212f;
+    --muted: #687385;
+    --paper: #fffef9;
+    --canvas: #f6f8f1;
+    --mint: #53d0a2;
+    --sky: #67b7f7;
+    --coral: #f97066;
+    --sun: #f7c948;
+    --plum: #8b5cf6;
+  }
+
   html {
-    font-family: 'Nunito', 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   body {
-    background-color: #F4F7FE;
-    color: #334155;
+    min-width: 320px;
+    background: var(--canvas);
+    color: var(--ink);
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Poppins', system-ui, sans-serif;
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    letter-spacing: 0;
+  }
+
+  ::selection {
+    background: rgba(83, 208, 162, 0.35);
+    color: var(--ink);
+  }
+}
+
+@layer components {
+  .app-canvas {
+    background-color: var(--canvas);
+    background-image:
+      linear-gradient(rgba(24, 33, 47, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(24, 33, 47, 0.045) 1px, transparent 1px),
+      linear-gradient(135deg, rgba(83, 208, 162, 0.12), transparent 36%),
+      linear-gradient(315deg, rgba(247, 201, 72, 0.12), transparent 32%);
+    background-size: 34px 34px, 34px 34px, 100% 100%, 100% 100%;
+  }
+
+  .play-card {
+    position: relative;
+    overflow: hidden;
+    background: rgba(255, 254, 249, 0.92);
+    border: 1px solid rgba(24, 33, 47, 0.11);
+    border-radius: 8px;
+    box-shadow: 0 18px 45px rgba(24, 33, 47, 0.07);
+  }
+
+  .play-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-top: 4px solid var(--card-accent, rgba(83, 208, 162, 0.75));
+  }
+
+  .ticket-edge {
+    background-image: linear-gradient(90deg, rgba(24, 33, 47, 0.13) 50%, transparent 50%);
+    background-size: 10px 1px;
+    background-repeat: repeat-x;
+  }
+
+  .soft-pop {
+    animation: soft-pop 240ms ease-out both;
+  }
+
+  .subtle-bob {
+    animation: subtle-bob 4.5s ease-in-out infinite;
   }
 }
 
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: theme('colors.slate.300') transparent;
+    scrollbar-color: rgba(104, 115, 133, 0.35) transparent;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@keyframes soft-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes subtle-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
   }
 }

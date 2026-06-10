@@ -1,15 +1,16 @@
 const variants = {
-  primary: 'bg-brand-500 hover:bg-brand-600 text-white',
-  secondary: 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200',
-  danger: 'bg-rose-500 hover:bg-rose-600 text-white',
-  ghost: 'hover:bg-slate-100 text-slate-600',
-  success: 'bg-emerald-500 hover:bg-emerald-600 text-white',
+  primary: 'border-ink bg-ink text-white hover:bg-[#0f1722]',
+  secondary: 'border-ink/15 bg-white text-ink hover:border-ink hover:bg-paper',
+  danger: 'border-coral bg-coral text-white hover:bg-[#e85f55]',
+  ghost: 'border-transparent bg-transparent text-muted hover:border-ink/10 hover:bg-white hover:text-ink',
+  success: 'border-brand-600 bg-brand-500 text-ink hover:bg-brand-400',
+  sun: 'border-ink bg-sun text-ink hover:bg-[#f4bc2d]',
 }
 
 const sizes = {
-  sm: 'px-4 py-1.5 text-xs',
-  md: 'px-5 py-2 text-sm',
-  lg: 'px-6 py-2.5 text-sm',
+  sm: 'min-h-8 px-3 py-1.5 text-xs',
+  md: 'min-h-10 px-4 py-2 text-sm',
+  lg: 'min-h-11 px-5 py-2.5 text-sm',
 }
 
 export default function Button({
@@ -25,10 +26,11 @@ export default function Button({
     <button
       disabled={disabled || loading}
       className={`
-        inline-flex items-center justify-center gap-2 rounded-full font-semibold
-        transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-brand-400/50 focus:ring-offset-2
-        disabled:opacity-50 disabled:cursor-not-allowed
-        hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:shadow-none
+        inline-flex items-center justify-center gap-2 rounded-lg border font-bold
+        transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-brand-300 focus:ring-offset-2
+        disabled:cursor-not-allowed disabled:opacity-50
+        enabled:hover:-translate-x-0.5 enabled:hover:-translate-y-0.5 enabled:hover:shadow-button
+        enabled:active:translate-x-0 enabled:active:translate-y-0 enabled:active:shadow-none
         ${variants[variant]}
         ${sizes[size]}
         ${className}
