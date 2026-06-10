@@ -49,9 +49,6 @@ class WebSearchImportRequest(BaseModel):
         return normalized
 
 
-GoogleSearchImportRequest = WebSearchImportRequest
-
-
 class SourceImportResponse(BaseModel):
     source_name: str
     status: str

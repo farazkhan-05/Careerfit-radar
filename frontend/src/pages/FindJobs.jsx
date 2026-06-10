@@ -24,7 +24,7 @@ import EmptyState from '../components/ui/EmptyState'
 import Badge from '../components/ui/Badge'
 import { PageSpinner } from '../components/ui/Spinner'
 
-const SOURCE_COLORS = { google_search: 'teal', tavily_search: 'teal' }
+const SOURCE_COLORS = { tavily_search: 'teal' }
 const ACTIVE_IMPORT_STATUSES = new Set(['pending', 'running'])
 const TERMINAL_WORKFLOW_STATUSES = new Set(['completed', 'completed_with_errors', 'failed'])
 const SCORE_BATCH_LIMIT = 10
@@ -158,7 +158,7 @@ export default function FindJobs() {
 
     const activeGoogleWorkflow = workflowsQ.data?.items?.find((workflow) => {
       return (
-        (workflow.source_name === 'tavily_search' || workflow.source_name === 'google_search') &&
+        workflow.source_name === 'tavily_search' &&
         ACTIVE_IMPORT_STATUSES.has(workflow.status) &&
         workflow.run_id &&
         !ignoredImportRunIdsRef.current.has(workflow.run_id)
@@ -440,9 +440,7 @@ export default function FindJobs() {
 }
 
 function getWebSearchImportSummary(workflowRun) {
-  const sourceResult = workflowRun.state?.source_results?.find((result) => (
-    result.source_name === 'tavily_search' || result.source_name === 'google_search'
-  )) ?? {}
+  const sourceResult = workflowRun.state?.source_results?.find((result) => result.source_name === 'tavily_search') ?? {}
   return {
     jobs_fetched: Number(sourceResult.jobs_fetched ?? 0),
     jobs_stored: Number(sourceResult.jobs_stored ?? 0),

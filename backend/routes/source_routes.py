@@ -24,15 +24,6 @@ from backend.workflows.job_discovery_graph import (
 router = APIRouter(prefix="/sources", tags=["sources"])
 
 
-@router.post("/import/google-search", response_model=WorkflowTriggerResponse, status_code=status.HTTP_202_ACCEPTED)
-def import_google_search_jobs(
-    background_tasks: BackgroundTasks,
-    payload: WebSearchImportRequest | None = Body(default=None),
-    db: Session = Depends(get_db),
-) -> WorkflowTriggerResponse:
-    return import_web_search_jobs(background_tasks, payload, db)
-
-
 @router.post("/import/web-search", response_model=WorkflowTriggerResponse, status_code=status.HTTP_202_ACCEPTED)
 def import_web_search_jobs(
     background_tasks: BackgroundTasks,
