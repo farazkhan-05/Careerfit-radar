@@ -42,6 +42,7 @@ def update_profile(profile_id: UUID, payload: dict[str, object] = Body(...), db:
 @router.post("/score-jobs", status_code=200)
 def score_jobs(
     limit: int = Query(default=10, ge=1, le=50),
+    rescore: bool = Query(default=False),
     db: Session = Depends(get_db),
 ) -> dict:
     profile = db.execute(
@@ -50,9 +51,15 @@ def score_jobs(
     if profile is None:
         raise HTTPException(status_code=422, detail="No candidate profile found. Upload a resume with AI extraction enabled first.")
 
-    scored_job_ids = select(db_models.JobScore.job_id).where(
-        db_models.JobScore.candidate_profile_id == profile.id
-    )
+    if rescore:
+        db.execute(
+            delete(db_models.JobScore).where(
+                db_models.JobScore.candidate_profile_id == profile.id
+            )
+        )
+        db.flush()
+
+    scored_job_ids = select(db_models.JobScore.job_id).where(db_models.JobScore.candidate_profile_id == profile.id)
     unscored_jobs = select(db_models.Job).where(db_models.Job.id.not_in(scored_job_ids))
     remaining_before = db.execute(
         select(func.count()).select_from(unscored_jobs.subquery())
@@ -73,6 +80,7 @@ def score_jobs(
             "remaining_unscored_count": 0,
             "total_scored": total_scored,
             "profile_id": str(profile.id),
+            "rescored": rescore,
             "message": "All jobs already scored.",
         }
 
@@ -94,6 +102,7 @@ def score_jobs(
         "remaining_unscored_count": remaining_unscored_count,
         "total_scored": total_scored,
         "profile_id": str(profile.id),
+        "rescored": rescore,
     }
 
 
@@ -130,9 +139,20 @@ _EXP_PATTERNS = (
 
 def _extract_all_skills(profile: db_models.CandidateProfile) -> list[str]:
     skills: list[str] = []
-    for value in profile.skills.values():
+    for value in getattr(profile, "skills", {}).values():
         if isinstance(value, list):
             skills.extend(str(s) for s in value if s)
+        elif isinstance(value, dict):
+            for nested in value.values():
+                if isinstance(nested, list):
+                    skills.extend(str(s) for s in nested if s)
+                elif nested:
+                    skills.append(str(nested))
+        elif value:
+            skills.append(str(value))
+    for project in getattr(profile, "projects", []) or []:
+        if isinstance(project, dict):
+            skills.extend(str(skill) for skill in project.get("technologies") or [] if skill)
     return skills
 
 

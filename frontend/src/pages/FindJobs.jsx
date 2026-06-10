@@ -102,6 +102,7 @@ export default function FindJobs() {
   const mountedRef = useRef(false)
   const ignoredImportRunIdsRef = useRef(new Set())
   const scoreRunRef = useRef(0)
+  const profileSearchAppliedRef = useRef(false)
 
   const [importMsg, setImportMsg] = useState(null)
   const [scoreMsg, setScoreMsg] = useState(null)
@@ -122,6 +123,23 @@ export default function FindJobs() {
   })
   const profile = profilesQ.data?.items?.[0]
   const isImportPolling = Boolean(activeImportRunId)
+
+  useEffect(() => {
+    if (!profile || profileSearchAppliedRef.current) {
+      return
+    }
+    const profileQuery = buildProfileSearchQuery(profile)
+    if (!profileQuery) {
+      return
+    }
+    setWebSearch((current) => {
+      if (current.query.trim() && current.query.trim() !== 'Software Engineer') {
+        return current
+      }
+      profileSearchAppliedRef.current = true
+      return { ...current, query: profileQuery }
+    })
+  }, [profile])
 
   useEffect(() => {
     mountedRef.current = true
@@ -214,8 +232,10 @@ export default function FindJobs() {
     setScoreProgress({ isRunning: true, remaining: null, scored: 0 })
 
     try {
+      let isFirstBatch = true
       do {
-        const data = await scoreMut.mutateAsync({ limit: SCORE_BATCH_LIMIT })
+        const data = await scoreMut.mutateAsync({ limit: SCORE_BATCH_LIMIT, rescore: isFirstBatch })
+        isFirstBatch = false
         if (!mountedRef.current || scoreRunRef.current !== runToken) {
           return
         }
@@ -230,7 +250,7 @@ export default function FindJobs() {
       if (totalScored === 0) {
         setScoreMsg({ type: 'success', message: 'All jobs already scored. Job Matches is ready.' })
       } else {
-        setScoreMsg({ type: 'success', message: `Scored ${totalScored} jobs against your profile.` })
+        setScoreMsg({ type: 'success', message: `Refreshed ${totalScored} job score${totalScored !== 1 ? 's' : ''} against your profile.` })
       }
     } catch (err) {
       if (!mountedRef.current || scoreRunRef.current !== runToken) {
@@ -451,4 +471,48 @@ function getWorkflowErrorMessage(workflowRun) {
   const sourceError = workflowRun.state?.source_results?.find((result) => result.error_message)?.error_message
   const workflowError = workflowRun.errors?.[0]?.message
   return sourceError || workflowError || 'Check the workflow run for details.'
+}
+
+function buildProfileSearchQuery(profile) {
+  const targetRole = profile?.target_roles?.find((role) => typeof role === 'string' && role.trim())
+  const skills = collectProfileSkills(profile?.skills).slice(0, 4)
+  const query = [targetRole, ...skills].filter(Boolean).join(' ')
+  return query.trim()
+}
+
+function collectProfileSkills(skills) {
+  if (!skills || typeof skills !== 'object') {
+    return []
+  }
+  const values = []
+  Object.values(skills).forEach((value) => {
+    if (Array.isArray(value)) {
+      values.push(...value)
+      return
+    }
+    if (value && typeof value === 'object') {
+      Object.values(value).forEach((nested) => {
+        if (Array.isArray(nested)) {
+          values.push(...nested)
+        } else if (nested) {
+          values.push(nested)
+        }
+      })
+      return
+    }
+    if (value) {
+      values.push(value)
+    }
+  })
+  const seen = new Set()
+  return values
+    .map((value) => String(value).trim())
+    .filter((value) => {
+      const key = value.toLowerCase()
+      if (!value || seen.has(key)) {
+        return false
+      }
+      seen.add(key)
+      return true
+    })
 }

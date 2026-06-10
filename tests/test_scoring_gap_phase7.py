@@ -23,6 +23,7 @@ class FakeJob:
     remote_type: str | None = "remote"
     posted_at: datetime | None = field(default_factory=lambda: datetime.now(UTC) - timedelta(days=2))
     source: str = "greenhouse"
+    description: str = "Build Python, FastAPI, PostgreSQL, and Docker services."
 
 
 @dataclass
@@ -100,18 +101,66 @@ def test_fit_score_weights_must_total_100() -> None:
 def test_default_fit_score_weights_balance_skills_and_freshness() -> None:
     weights = FitScoreWeights()
 
-    assert weights.role_match == 20
-    assert weights.skill_match == 25
-    assert weights.semantic_similarity == 0
-    assert weights.experience_fit == 20
-    assert weights.freshness == 15
-    assert weights.location_fit == 15
+    assert weights.role_match == 18
+    assert weights.skill_match == 30
+    assert weights.semantic_similarity == 22
+    assert weights.experience_fit == 10
+    assert weights.freshness == 8
+    assert weights.location_fit == 7
     assert weights.source_reliability == 5
     weights.validate()
 
 
+def test_fit_scoring_matches_common_stack_synonyms() -> None:
+    service = FitScoringService()
+    candidate = FakeCandidateProfile(
+        target_roles=["Frontend Software Engineer"],
+        skills={"technical": ["React", "JavaScript"], "backend": ["Node.js"]},
+        experience_years=3,
+    )
+    requirements = FakeRequirement(
+        required_skills=["React.js", "JS", "NodeJS"],
+        preferred_skills=["ReactJS"],
+        min_experience_years=2,
+    )
+    job = FakeJob(
+        title="Frontend Software Engineer",
+        description="Build React.js interfaces with JS and NodeJS services.",
+    )
+
+    result = service.score_job(
+        job=job,
+        candidate_profile=candidate,
+        requirements=requirements,
+    )
+
+    assert set(result.score.matched_skills) == {"React.js", "JS", "NodeJS"}
+    assert result.score.missing_skills == []
+    assert result.score.final_score >= 85
+
+
+def test_fit_scoring_avoids_java_javascript_false_positive() -> None:
+    service = FitScoringService()
+    candidate = FakeCandidateProfile(skills={"technical": ["JavaScript", "Preact"]})
+    requirements = FakeRequirement(
+        required_skills=["Java", "React"],
+        preferred_skills=[],
+        min_experience_years=None,
+    )
+    job = FakeJob(title="Java Engineer", description="Build Java services.")
+
+    result = service.score_job(
+        job=job,
+        candidate_profile=candidate,
+        requirements=requirements,
+    )
+
+    assert result.score.matched_skills == []
+    assert result.score.missing_skills == ["Java", "React"]
+
+
 def test_experience_fit_ratio_scores_unknown_and_fractional_experience() -> None:
-    assert _experience_fit_ratio(0.5, None) == 0.5
+    assert _experience_fit_ratio(0.5, None) == 0.7
     assert _experience_fit_ratio(0.5, 1.0) == 0.5
     assert _experience_fit_ratio(0.5, 2.0) == 0.25
     assert _experience_fit_ratio(1.0, 2.0) == 0.5

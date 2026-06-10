@@ -123,7 +123,7 @@ class TavilySearchSource(JobSource):
             "topic": "general",
             "max_results": _MAX_RESULTS,
             "include_answer": False,
-            "include_raw_content": False,
+            "include_raw_content": "text",
             "include_images": False,
             "include_domains": list(_ATS_DOMAINS),
             "include_usage": True,
@@ -190,7 +190,7 @@ class TavilySearchSource(JobSource):
             return None
 
         title = as_text(item.get("title")) or "Unknown Title"
-        content = as_text(item.get("content")) or title
+        content = as_text(item.get("raw_content")) or as_text(item.get("content")) or title
         company = _extract_company_from_url(apply_url) or "Direct ATS"
         source_job_id = sha256(apply_url.encode()).hexdigest()[:64]
 

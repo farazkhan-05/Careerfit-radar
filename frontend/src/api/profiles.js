@@ -18,7 +18,7 @@ export async function deleteAllProfiles() {
   await apiClient.delete('/profiles')
 }
 
-export async function scoreJobs({ limit = 10 } = {}) {
-  const { data } = await apiClient.post('/profiles/score-jobs', null, { params: { limit } })
+export async function scoreJobs({ limit = 10, rescore = false } = {}) {
+  const { data } = await apiClient.post('/profiles/score-jobs', null, { params: { limit, rescore } })
   return data
 }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Protocol
@@ -7,6 +8,71 @@ from uuid import UUID
 
 from backend.models.schemas import JobScoreCreate
 from backend.utils.text_utils import normalize_for_match, normalize_text
+
+_NON_WORD_RE = re.compile(r"[^a-z0-9]+")
+_COMPACT_RE = re.compile(r"[^a-z0-9]+")
+
+_SKILL_SYNONYMS: dict[str, tuple[str, ...]] = {
+    "angular": ("angularjs", "angular.js", "angular js"),
+    "aws": ("amazon web services",),
+    "c sharp": ("c#", "csharp"),
+    "ci cd": ("ci/cd", "cicd", "continuous integration", "continuous delivery"),
+    "css": ("css3", "cascading style sheets"),
+    "express": ("express.js", "expressjs", "express js"),
+    "fastapi": ("fast api",),
+    "frontend": ("front end", "front-end"),
+    "frontend engineer": (
+        "front end engineer",
+        "front-end engineer",
+        "frontend developer",
+        "front end developer",
+        "front-end developer",
+    ),
+    "git": ("github", "gitlab"),
+    "html": ("html5",),
+    "javascript": ("js", "ecmascript", "java script"),
+    "kubernetes": ("k8s",),
+    "mongodb": ("mongo db", "mongo"),
+    "node": ("node.js", "nodejs", "node js"),
+    "postgresql": ("postgres", "postgres sql"),
+    "react": ("react.js", "reactjs", "react js"),
+    "software engineer": (
+        "software developer",
+        "software engineering",
+        "full time software engineer",
+        "full-time software engineer",
+        "fulltime software engineer",
+        "full time software engineering",
+        "full-time software engineering",
+        "fulltime software engineering",
+    ),
+    "typescript": ("ts", "type script"),
+    "vue": ("vue.js", "vuejs", "vue js"),
+}
+
+_ALIAS_TO_CANONICAL = {
+    alias: canonical
+    for canonical, aliases in _SKILL_SYNONYMS.items()
+    for alias in (
+        _NON_WORD_RE.sub(" ", canonical.casefold()).strip(),
+        *(_NON_WORD_RE.sub(" ", item.casefold()).strip() for item in aliases),
+    )
+}
+
+_CANONICAL_TO_ALIASES: dict[str, frozenset[str]] = {
+    canonical: frozenset(
+        _NON_WORD_RE.sub(" ", item.casefold()).strip()
+        for item in (canonical, *aliases)
+    )
+    for canonical, aliases in _SKILL_SYNONYMS.items()
+}
+
+_BLOCKED_OVERLAPS = {
+    frozenset(("java", "javascript")),
+    frozenset(("go", "django")),
+    frozenset(("r", "rust")),
+    frozenset(("sql", "nosql")),
+}
 
 
 class ScorableJob(Protocol):
@@ -35,17 +101,23 @@ class ScorableJobRequirement(Protocol):
 class ScoringPreferences:
     preferred_countries: tuple[str, ...] = ()
     preferred_work_modes: tuple[str, ...] = ()
-    preferred_sources: tuple[str, ...] = ("tavily_search",)
+    preferred_sources: tuple[str, ...] = (
+        "tavily_search",
+        "manual",
+        "greenhouse",
+        "lever",
+        "smartrecruiters",
+    )
 
 
 @dataclass(frozen=True)
 class FitScoreWeights:
-    role_match: int = 20
-    skill_match: int = 25
-    semantic_similarity: int = 0
-    experience_fit: int = 20
-    freshness: int = 15
-    location_fit: int = 15
+    role_match: int = 18
+    skill_match: int = 30
+    semantic_similarity: int = 22
+    experience_fit: int = 10
+    freshness: int = 8
+    location_fit: int = 7
     source_reliability: int = 5
 
     def validate(self) -> None:
@@ -88,19 +160,33 @@ class FitScoringService:
         semantic_similarity_score: int | None = None,
     ) -> FitScoreResult:
         matched_skills, missing_skills = _match_skills(candidate_profile, requirements)
+        semantic_component = (
+            _bounded_component(semantic_similarity_score, self._weights.semantic_similarity)
+            if semantic_similarity_score is not None
+            else _weighted_score(
+                _semantic_similarity_ratio(
+                    job=job,
+                    candidate_profile=candidate_profile,
+                    requirements=requirements,
+                    matched_skills=matched_skills,
+                ),
+                self._weights.semantic_similarity,
+            )
+        )
         component_scores = {
             "role_match_score": _weighted_score(
                 _role_match_ratio(job.title, candidate_profile.target_roles),
                 self._weights.role_match,
             ),
             "skill_match_score": _weighted_score(
-                _skill_match_ratio(matched_skills, requirements.required_skills),
+                _skill_match_ratio(
+                    matched_skills,
+                    requirements.required_skills,
+                    requirements.preferred_skills,
+                ),
                 self._weights.skill_match,
             ),
-            "semantic_similarity_score": _bounded_component(
-                semantic_similarity_score,
-                self._weights.semantic_similarity,
-            ),
+            "semantic_similarity_score": semantic_component,
             "experience_fit_score": _weighted_score(
                 _experience_fit_ratio(
                     candidate_profile.experience_years,
@@ -157,6 +243,7 @@ class FitScoringService:
 
 def _candidate_skill_set(candidate_profile: ScorableCandidateProfile) -> set[str]:
     values: list[str] = []
+    values.extend(str(role) for role in candidate_profile.target_roles)
     for raw_value in candidate_profile.skills.values():
         if isinstance(raw_value, list):
             values.extend(str(item) for item in raw_value)
@@ -168,7 +255,11 @@ def _candidate_skill_set(candidate_profile: ScorableCandidateProfile) -> set[str
                     values.append(str(nested_value))
         elif raw_value is not None:
             values.append(str(raw_value))
-    return {normalize_for_match(value) for value in values if normalize_text(value)}
+    return {
+        _canonical_lookup_key(_normalize_lookup_key(value))
+        for value in values
+        if normalize_text(value)
+    }
 
 
 def _match_skills(
@@ -178,16 +269,21 @@ def _match_skills(
     candidate_skills = _candidate_skill_set(candidate_profile)
     required = _dedupe(requirements.required_skills)
     preferred = _dedupe(requirements.preferred_skills)
-    all_skills = required + [skill for skill in preferred if skill not in required]
+    required_keys = {_canonical_lookup_key(_normalize_lookup_key(skill)) for skill in required}
+    all_skills = required + [
+        skill
+        for skill in preferred
+        if _canonical_lookup_key(_normalize_lookup_key(skill)) not in required_keys
+    ]
     matched = [
         skill
         for skill in all_skills
-        if normalize_for_match(skill) in candidate_skills
+        if _skill_matches_candidate(skill, candidate_skills)
     ]
     missing = [
         skill
         for skill in required
-        if normalize_for_match(skill) not in candidate_skills
+        if not _skill_matches_candidate(skill, candidate_skills)
     ]
     return matched, missing
 
@@ -207,13 +303,21 @@ def _role_match_ratio(title: str, target_roles: list[str]) -> float:
     return best_overlap
 
 
-def _skill_match_ratio(matched_skills: list[str], required_skills: list[str]) -> float:
+def _skill_match_ratio(
+    matched_skills: list[str],
+    required_skills: list[str],
+    preferred_skills: list[str],
+) -> float:
     required = _dedupe(required_skills)
-    if not required:
-        return 1.0
-    required_keys = {normalize_for_match(skill) for skill in required}
-    matched_keys = {normalize_for_match(skill) for skill in matched_skills}
-    return len(required_keys & matched_keys) / len(required_keys)
+    preferred = _dedupe(preferred_skills)
+    matched_keys = {_canonical_lookup_key(_normalize_lookup_key(skill)) for skill in matched_skills}
+    if required:
+        required_keys = {_canonical_lookup_key(_normalize_lookup_key(skill)) for skill in required}
+        return len(required_keys & matched_keys) / len(required_keys)
+    if preferred:
+        preferred_keys = {_canonical_lookup_key(_normalize_lookup_key(skill)) for skill in preferred}
+        return len(preferred_keys & matched_keys) / len(preferred_keys)
+    return 0.4
 
 
 def _experience_fit_ratio(
@@ -221,7 +325,7 @@ def _experience_fit_ratio(
     required_years: float | None,
 ) -> float:
     if required_years is None:
-        return 0.5
+        return 0.7
     if candidate_years is None:
         return 0.4
     candidate_years = max(0.0, float(candidate_years))
@@ -235,7 +339,7 @@ def _experience_fit_ratio(
 
 def _freshness_ratio(posted_at: datetime | None) -> float:
     if posted_at is None:
-        return 0.5
+        return 0.7
     age_days = max(0, (datetime.now(UTC) - posted_at.astimezone(UTC)).days)
     if age_days <= 7:
         return 1.0
@@ -275,6 +379,109 @@ def _bounded_component(value: int | None, max_score: int) -> int:
     if value is None:
         return 0
     return max(0, min(max_score, value))
+
+
+def _semantic_similarity_ratio(
+    *,
+    job: ScorableJob,
+    candidate_profile: ScorableCandidateProfile,
+    requirements: ScorableJobRequirement,
+    matched_skills: list[str],
+) -> float:
+    role_ratio = _role_match_ratio(job.title, candidate_profile.target_roles)
+    visible_skill_ratio = _visible_skill_signal_ratio(
+        matched_skills,
+        requirements.required_skills,
+        requirements.preferred_skills,
+    )
+    term_ratio = _profile_term_presence_ratio(job=job, candidate_profile=candidate_profile)
+    if visible_skill_ratio == 0 and term_ratio == 0:
+        return role_ratio * 0.35
+    return (role_ratio * 0.3) + (visible_skill_ratio * 0.5) + (term_ratio * 0.2)
+
+
+def _visible_skill_signal_ratio(
+    matched_skills: list[str],
+    required_skills: list[str],
+    preferred_skills: list[str],
+) -> float:
+    required = _dedupe(required_skills)
+    preferred = _dedupe(preferred_skills)
+    visible = required + [skill for skill in preferred if skill not in required]
+    if not visible:
+        return 0.0
+    visible_keys = {_canonical_lookup_key(_normalize_lookup_key(skill)) for skill in visible}
+    matched_keys = {_canonical_lookup_key(_normalize_lookup_key(skill)) for skill in matched_skills}
+    return len(visible_keys & matched_keys) / len(visible_keys)
+
+
+def _profile_term_presence_ratio(
+    *,
+    job: ScorableJob,
+    candidate_profile: ScorableCandidateProfile,
+) -> float:
+    terms = _candidate_profile_terms(candidate_profile)
+    if not terms:
+        return 0.0
+    job_text = _normalize_lookup_key(
+        " ".join(
+            (
+                job.title,
+                getattr(job, "description", "") or "",
+                job.location or "",
+                job.remote_type or "",
+            )
+        )
+    )
+    matched = sum(1 for term in terms if _term_present_in_text(term, job_text))
+    return min(1.0, matched / min(len(terms), 6))
+
+
+def _candidate_profile_terms(candidate_profile: ScorableCandidateProfile) -> tuple[str, ...]:
+    values: list[str] = []
+    values.extend(str(role) for role in candidate_profile.target_roles)
+    for raw_value in candidate_profile.skills.values():
+        if isinstance(raw_value, list):
+            values.extend(str(item) for item in raw_value)
+        elif isinstance(raw_value, dict):
+            for nested_value in raw_value.values():
+                if isinstance(nested_value, list):
+                    values.extend(str(item) for item in nested_value)
+                elif nested_value is not None:
+                    values.append(str(nested_value))
+        elif raw_value is not None:
+            values.append(str(raw_value))
+    projects = getattr(candidate_profile, "projects", []) or []
+    for project in projects:
+        if not isinstance(project, dict):
+            continue
+        for technology in project.get("technologies") or []:
+            values.append(str(technology))
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        key = _canonical_lookup_key(_normalize_lookup_key(value))
+        if key and key not in seen:
+            seen.add(key)
+            deduped.append(key)
+    return tuple(deduped)
+
+
+def _term_present_in_text(term_key: str, text_key: str) -> bool:
+    if not term_key or not text_key:
+        return False
+    equivalent_terms = _equivalent_keys(term_key)
+    text_tokens = set(_tokenize_key(text_key))
+    text_compact_tokens = {_compact_key(token) for token in text_tokens}
+    for candidate in equivalent_terms:
+        candidate_tokens = set(_tokenize_key(candidate))
+        if candidate_tokens and candidate_tokens.issubset(text_tokens):
+            return True
+        compact = _compact_key(candidate)
+        if compact and compact in text_compact_tokens:
+            return True
+    return False
 
 
 def _risk_flags(
@@ -321,3 +528,65 @@ def _dedupe(values: list[str]) -> list[str]:
             seen.add(key)
             deduped.append(cleaned)
     return deduped
+
+
+def _skill_matches_candidate(skill: str, candidate_skills: set[str]) -> bool:
+    key = _canonical_lookup_key(_normalize_lookup_key(skill))
+    if key in candidate_skills:
+        return True
+    return any(_has_logical_overlap(key, candidate_key) for candidate_key in candidate_skills)
+
+
+def _normalize_lookup_key(value: str) -> str:
+    normalized = normalize_for_match(value)
+    normalized = normalized.replace("&", " and ")
+    normalized = normalized.replace("+", " plus ")
+    return _NON_WORD_RE.sub(" ", normalized).strip()
+
+
+def _canonical_lookup_key(value: str) -> str:
+    key = _normalize_lookup_key(value)
+    return _ALIAS_TO_CANONICAL.get(key, key)
+
+
+def _equivalent_keys(key: str) -> frozenset[str]:
+    canonical = _canonical_lookup_key(key)
+    return _CANONICAL_TO_ALIASES.get(canonical, frozenset((canonical,)))
+
+
+def _has_logical_overlap(required_key: str, evidence_key: str) -> bool:
+    if not required_key or not evidence_key:
+        return False
+    if required_key == evidence_key:
+        return True
+    if frozenset((required_key, evidence_key)) in _BLOCKED_OVERLAPS:
+        return False
+
+    required_tokens = set(_tokenize_key(required_key))
+    evidence_tokens = set(_tokenize_key(evidence_key))
+    meaningful_required = {token for token in required_tokens if len(token) >= 4}
+    meaningful_evidence = {token for token in evidence_tokens if len(token) >= 4}
+    if meaningful_required and meaningful_required.issubset(meaningful_evidence):
+        return True
+    if meaningful_evidence and meaningful_evidence.issubset(meaningful_required):
+        return True
+
+    required_compact = _compact_key(required_key)
+    evidence_compact = _compact_key(evidence_key)
+    if not required_compact or not evidence_compact:
+        return False
+    if frozenset((required_compact, evidence_compact)) in _BLOCKED_OVERLAPS:
+        return False
+
+    shorter, longer = sorted((required_compact, evidence_compact), key=len)
+    if len(shorter) < 4:
+        return False
+    return longer.startswith(shorter)
+
+
+def _compact_key(value: str) -> str:
+    return _COMPACT_RE.sub("", value)
+
+
+def _tokenize_key(value: str) -> tuple[str, ...]:
+    return tuple(token for token in _NON_WORD_RE.split(value) if token)
