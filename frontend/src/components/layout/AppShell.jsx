@@ -3,7 +3,7 @@ import Sidebar from './Sidebar'
 
 export default function AppShell() {
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen" style={{ backgroundColor: '#F4F7FE' }}>
       <Sidebar />
       <main className="flex-1 ml-56 min-h-screen overflow-y-auto">
         <Outlet />

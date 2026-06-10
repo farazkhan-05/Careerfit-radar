@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ExternalLink, BookmarkPlus, Trash2, Zap } from 'lucide-react'
+import Chip from '@mui/material/Chip'
 import { listJobs, deleteJob, deleteAllJobs } from '../api/jobs'
 import { saveJob } from '../api/applications'
 import { Card } from '../components/ui/Card'
@@ -16,12 +17,13 @@ const PAGE_SIZE = 25
 
 function MatchScoreBadge({ score }) {
   if (score == null) return null
-  const color = score >= 70 ? 'bg-emerald-100 text-emerald-700' : score >= 50 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${color}`}>
-      ⚡ {score}% match
-    </span>
-  )
+  const sx =
+    score >= 70
+      ? { bgcolor: '#dcfce7', color: '#15803d', fontWeight: 700, fontSize: '0.7rem', height: 22 }
+      : score >= 50
+        ? { bgcolor: '#fef3c7', color: '#a16207', fontWeight: 700, fontSize: '0.7rem', height: 22 }
+        : { bgcolor: '#e0e7ff', color: '#4338ca', fontWeight: 700, fontSize: '0.7rem', height: 22 }
+  return <Chip label={`⚡ ${score}% match`} size="small" sx={sx} />
 }
 
 function JobCard({ job, onSave, saving, onDelete, deleting }) {
@@ -34,24 +36,24 @@ function JobCard({ job, onSave, saving, onDelete, deleting }) {
   }
 
   return (
-    <Card className="hover:shadow-md transition-shadow duration-150">
+    <Card className="transition-all duration-150 hover:-translate-y-0.5">
       <div className="flex items-start gap-4">
         <div className={`h-10 w-1 rounded-full flex-shrink-0 mt-1 ${
           job.match_score >= 70 ? 'bg-gradient-to-b from-emerald-400 to-teal-400'
           : job.match_score >= 50 ? 'bg-gradient-to-b from-amber-400 to-orange-400'
-          : 'bg-gradient-to-b from-brand-400 to-indigo-400'
+          : 'bg-gradient-to-b from-brand-400 to-brand-600'
         }`} />
 
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 mb-2">
-            <h3 className="text-sm font-semibold text-slate-900 leading-snug">{job.title}</h3>
+            <h3 className="text-sm font-semibold text-slate-800 leading-snug">{job.title}</h3>
             <div className="flex items-center gap-1.5 flex-shrink-0">
               <MatchScoreBadge score={job.match_score} />
               <StatusBadge status={job.status} />
               <button
                 onClick={() => onDelete(job.id)}
                 disabled={deleting}
-                className="p-1 text-slate-300 hover:text-rose-500 transition-colors"
+                className="p-1 text-slate-300 hover:text-rose-500 transition-colors rounded-full hover:bg-rose-50"
                 title="Delete job"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -61,9 +63,9 @@ function JobCard({ job, onSave, saving, onDelete, deleting }) {
 
           <div className="flex flex-wrap items-center gap-2 mb-3">
             <SourceBadge source={job.source} />
-            {job.location && <span className="text-xs text-slate-500">📍 {job.location}</span>}
+            {job.location && <span className="text-xs text-slate-400">📍 {job.location}</span>}
             {job.remote_type && (
-              <span className="text-xs text-slate-500 capitalize">
+              <span className="text-xs text-slate-400 capitalize">
                 {job.remote_type === 'remote' ? '🌍' : job.remote_type === 'hybrid' ? '🔀' : '🏢'} {job.remote_type}
               </span>
             )}
@@ -75,26 +77,40 @@ function JobCard({ job, onSave, saving, onDelete, deleting }) {
           </div>
 
           {job.description && (
-            <p className="text-xs text-slate-500 line-clamp-2 mb-3">{job.description}</p>
+            <p className="text-xs text-slate-400 line-clamp-2 mb-3">{job.description}</p>
           )}
 
           {job.match_explanation && (
             <div className="mb-3">
-              <button onClick={() => setShowExplanation(v => !v)} className="text-xs text-brand-600 hover:text-brand-700 underline-offset-2 hover:underline">
+              <button
+                onClick={() => setShowExplanation(v => !v)}
+                className="text-xs text-brand-500 hover:text-brand-600 underline-offset-2 hover:underline font-semibold"
+              >
                 {showExplanation ? 'Hide' : 'Why this score?'}
               </button>
               {showExplanation && (
-                <p className="mt-1.5 text-xs text-slate-500 bg-slate-50 rounded-lg p-2.5">{job.match_explanation}</p>
+                <p className="mt-1.5 text-xs text-slate-500 bg-slate-50 rounded-xl p-3">{job.match_explanation}</p>
               )}
             </div>
           )}
 
           <div className="flex items-center gap-2">
-            <Button variant={saved ? 'success' : 'secondary'} size="sm" loading={saving} disabled={saved || job.status === 'saved'} onClick={handleSave}>
+            <Button
+              variant={saved ? 'success' : 'secondary'}
+              size="sm"
+              loading={saving}
+              disabled={saved || job.status === 'saved'}
+              onClick={handleSave}
+            >
               <BookmarkPlus className="h-3.5 w-3.5" />
               {saved || job.status === 'saved' ? 'Saved' : 'Save'}
             </Button>
-            <a href={job.apply_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-600 hover:bg-brand-700 text-white transition-colors">
+            <a
+              href={job.apply_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold bg-brand-500 hover:bg-brand-600 text-white transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0"
+            >
               Apply <ExternalLink className="h-3 w-3" />
             </a>
           </div>
@@ -157,8 +173,8 @@ export default function Jobs() {
     <div className="p-8 max-w-4xl mx-auto">
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Job Matches</h1>
-          <p className="text-slate-500 mt-1">Browse and save jobs that match your profile</p>
+          <h1 className="text-2xl font-bold text-slate-800">Job Matches</h1>
+          <p className="text-slate-400 mt-1 font-medium">Browse and save jobs that match your profile</p>
         </div>
         {total > 0 && (
           <Button
@@ -208,8 +224,10 @@ export default function Jobs() {
           </div>
           <button
             onClick={() => { setTopMatches(v => !v); setOffset(0) }}
-            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
-              topMatches ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300'
+            className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-semibold border transition-all duration-150 hover:-translate-y-0.5 hover:shadow-sm ${
+              topMatches
+                ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300'
             }`}
           >
             <Zap className="h-3.5 w-3.5" />
@@ -220,7 +238,7 @@ export default function Jobs() {
 
       {/* Count */}
       {!jobsQ.isLoading && (
-        <div className="text-sm text-slate-500 mb-4">
+        <div className="text-sm text-slate-400 font-medium mb-4">
           {total} job{total !== 1 ? 's' : ''} found
         </div>
       )}
@@ -265,7 +283,7 @@ export default function Jobs() {
           >
             ← Previous
           </Button>
-          <span className="text-sm text-slate-500">
+          <span className="text-sm text-slate-400 font-medium">
             Page {currentPage} of {totalPages}
           </span>
           <Button

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Pencil, Trash2 } from 'lucide-react'
+import Chip from '@mui/material/Chip'
 import { listApplications, updateApplication, deleteApplication, deleteAllApplications } from '../api/applications'
 import { Card } from '../components/ui/Card'
 import Button from '../components/ui/Button'
@@ -43,13 +44,13 @@ function ApplicationCard({ application, onUpdate, onDelete }) {
             <StatusBadge status={application.status} />
             <span className="text-xs text-slate-400 font-mono truncate">{application.job_id}</span>
           </div>
-          <div className="flex flex-wrap gap-4 text-xs text-slate-500">
+          <div className="flex flex-wrap gap-4 text-xs text-slate-400 font-medium">
             <span>Saved: {formatDate(application.created_at)}</span>
             {application.applied_at && <span>Applied: {formatDate(application.applied_at)}</span>}
             {application.follow_up_at && <span>Follow up: {formatDate(application.follow_up_at)}</span>}
           </div>
           {application.notes && !editing && (
-            <p className="text-xs text-slate-500 mt-2 bg-slate-50 rounded p-2">{application.notes}</p>
+            <p className="text-xs text-slate-500 mt-2 bg-slate-50 rounded-xl p-3">{application.notes}</p>
           )}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -57,7 +58,7 @@ function ApplicationCard({ application, onUpdate, onDelete }) {
             variant="ghost"
             size="sm"
             onClick={() => setEditing((v) => !v)}
-            className="text-slate-500"
+            className="text-slate-400 hover:text-slate-600"
           >
             <Pencil className="h-3.5 w-3.5" />
           </Button>
@@ -155,8 +156,8 @@ export default function Applications() {
     <div className="p-8 max-w-3xl mx-auto">
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Applications</h1>
-          <p className="text-slate-500 mt-1">Track your job applications and follow-ups</p>
+          <h1 className="text-2xl font-bold text-slate-800">Applications</h1>
+          <p className="text-slate-400 mt-1 font-medium">Track your job applications and follow-ups</p>
         </div>
         {total > 0 && (
           <Button
@@ -179,33 +180,30 @@ export default function Applications() {
       {deleteMsg?.type === 'success' && <SuccessMessage message={deleteMsg.message} className="mb-4" />}
       {deleteMsg?.type === 'error' && <ErrorMessage message={deleteMsg.message} className="mb-4" />}
 
-      {/* Stats strip */}
+      {/* Status filter chips */}
       {total > 0 && (
         <div className="flex flex-wrap gap-2 mb-5">
           {Object.entries(statusCounts).map(([s, count]) => (
-            <button
+            <Chip
               key={s}
+              label={`${s.charAt(0).toUpperCase() + s.slice(1).replace('_', ' ')} · ${count}`}
               onClick={() => setStatusFilter(statusFilter === s ? '' : s)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-all ${
-                statusFilter === s
-                  ? 'bg-brand-600 text-white border-brand-600'
-                  : 'bg-white text-slate-600 border-slate-200 hover:border-brand-300'
-              }`}
-            >
-              {s.charAt(0).toUpperCase() + s.slice(1).replace('_', ' ')}
-              <span
-                className={`rounded-full px-1.5 py-0.5 text-xs ${
-                  statusFilter === s ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-                }`}
-              >
-                {count}
-              </span>
-            </button>
+              size="small"
+              sx={{
+                cursor: 'pointer',
+                fontWeight: 600,
+                fontSize: '0.75rem',
+                transition: 'all 150ms ease',
+                ...(statusFilter === s
+                  ? { bgcolor: '#6366F1', color: 'white', '&:hover': { bgcolor: '#4f46e5' } }
+                  : { bgcolor: 'white', color: '#475569', border: '1px solid #e2e8f0', '&:hover': { bgcolor: '#f8fafc', borderColor: '#a5b4fc' } })
+              }}
+            />
           ))}
           {statusFilter && (
             <button
               onClick={() => setStatusFilter('')}
-              className="text-xs text-slate-400 hover:text-slate-600 underline"
+              className="text-xs text-slate-400 hover:text-slate-600 underline self-center font-medium"
             >
               Clear filter
             </button>
@@ -215,7 +213,7 @@ export default function Applications() {
 
       {/* Count */}
       {!appsQ.isLoading && (
-        <div className="text-sm text-slate-500 mb-4">
+        <div className="text-sm text-slate-400 font-medium mb-4">
           {total} application{total !== 1 ? 's' : ''}{statusFilter ? ` · ${statusFilter}` : ''}
         </div>
       )}

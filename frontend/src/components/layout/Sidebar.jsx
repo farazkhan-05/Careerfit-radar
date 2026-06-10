@@ -19,15 +19,20 @@ const navItems = [
 
 export default function Sidebar() {
   return (
-    <aside className="fixed inset-y-0 left-0 w-56 bg-brand-900 flex flex-col z-40">
+    <aside
+      className="fixed inset-y-0 left-0 w-56 flex flex-col z-40"
+      style={{ background: 'linear-gradient(160deg, #4338ca 0%, #312e81 100%)' }}
+    >
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-5 py-5 border-b border-white/10">
-        <div className="h-8 w-8 rounded-lg bg-brand-600 flex items-center justify-center flex-shrink-0">
+        <div className="h-8 w-8 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
           <span className="text-white text-sm font-bold">CF</span>
         </div>
         <div>
-          <div className="text-white font-semibold text-sm leading-tight">CareerFit</div>
-          <div className="text-brand-300 text-xs leading-tight">Radar</div>
+          <div className="text-white font-bold text-sm leading-tight" style={{ fontFamily: 'Poppins, sans-serif' }}>
+            CareerFit
+          </div>
+          <div className="text-white/50 text-xs leading-tight">Radar</div>
         </div>
       </div>
 
@@ -40,10 +45,10 @@ export default function Sidebar() {
               to={to}
               end={end}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 ${
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150 ${
                   isActive
-                    ? 'bg-white/15 text-white font-medium'
-                    : 'text-brand-200 hover:bg-white/10 hover:text-white'
+                    ? 'bg-white/20 text-white font-semibold shadow-sm'
+                    : 'text-white/65 hover:bg-white/10 hover:text-white'
                 }`
               }
             >
@@ -56,7 +61,7 @@ export default function Sidebar() {
 
       {/* Footer hint */}
       <div className="px-5 py-4 border-t border-white/10">
-        <p className="text-brand-400 text-xs">AI-powered job search</p>
+        <p className="text-white/40 text-xs">AI-powered job search</p>
       </div>
     </aside>
   )

@@ -19,6 +19,21 @@ const ACTIVE_IMPORT_STATUSES = new Set(['pending', 'running'])
 const TERMINAL_WORKFLOW_STATUSES = new Set(['completed', 'completed_with_errors', 'failed'])
 const SCORE_BATCH_LIMIT = 10
 
+function StepIndicator({ number, active }) {
+  return (
+    <div
+      className={`h-7 w-7 rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0 transition-all ${
+        active
+          ? 'text-white shadow-md'
+          : 'bg-slate-200 text-slate-500'
+      }`}
+      style={active ? { background: 'linear-gradient(135deg, #6366F1, #4338ca)', boxShadow: '0 4px 10px rgba(99,102,241,0.35)' } : {}}
+    >
+      {number}
+    </div>
+  )
+}
+
 function RunsTable({ runs }) {
   if (runs.length === 0) {
     return (
@@ -30,25 +45,25 @@ function RunsTable({ runs }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-slate-100">
-            <th className="text-left py-2 px-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Source</th>
-            <th className="text-left py-2 px-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Status</th>
-            <th className="text-right py-2 px-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Fetched</th>
-            <th className="text-right py-2 px-3 text-xs font-medium text-slate-500 uppercase tracking-wide">Stored</th>
+            <th className="text-left py-2 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Source</th>
+            <th className="text-left py-2 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Status</th>
+            <th className="text-right py-2 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Fetched</th>
+            <th className="text-right py-2 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Stored</th>
           </tr>
         </thead>
         <tbody>
           {runs.map((run) => (
-            <tr key={run.id} className="border-b border-slate-50 hover:bg-slate-50">
+            <tr key={run.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
               <td className="py-2.5 px-3">
                 <Badge color={SOURCE_COLORS[run.source_name] ?? 'gray'}>{run.source_name}</Badge>
               </td>
               <td className="py-2.5 px-3">
-                <span className={`text-xs font-medium ${run.status === 'success' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                <span className={`text-xs font-semibold ${run.status === 'success' ? 'text-emerald-600' : 'text-rose-500'}`}>
                   {run.status}
                 </span>
               </td>
-              <td className="py-2.5 px-3 text-right text-slate-600">{run.jobs_fetched}</td>
-              <td className="py-2.5 px-3 text-right font-medium text-slate-900">{run.jobs_stored}</td>
+              <td className="py-2.5 px-3 text-right text-slate-500">{run.jobs_fetched}</td>
+              <td className="py-2.5 px-3 text-right font-bold text-slate-700">{run.jobs_stored}</td>
             </tr>
           ))}
         </tbody>
@@ -229,13 +244,13 @@ export default function FindJobs() {
   return (
     <div className="p-8 max-w-3xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">Find Jobs</h1>
-        <p className="text-slate-500 mt-1">Import jobs, then score them against your resume with AI</p>
+        <h1 className="text-2xl font-bold text-slate-800">Find Jobs</h1>
+        <p className="text-slate-400 mt-1 font-medium">Import jobs, then score them against your resume with AI</p>
       </div>
 
       <div className="flex items-center gap-3 mb-4">
-        <div className="h-7 w-7 rounded-full bg-brand-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</div>
-        <h2 className="text-base font-semibold text-slate-800">Import jobs</h2>
+        <StepIndicator number="1" active />
+        <h2 className="text-base font-semibold text-slate-700">Import jobs</h2>
       </div>
 
       {importMsg?.type === 'success' && <SuccessMessage message={importMsg.message} className="mb-4" />}
@@ -245,10 +260,13 @@ export default function FindJobs() {
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <div className="text-sm font-semibold text-slate-800">
-                Direct Web Search <span className="text-xs font-normal text-emerald-600 ml-1">ATS Boards</span>
+              <div className="text-sm font-semibold text-slate-700">
+                Direct Web Search{' '}
+                <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full ml-1">
+                  ATS Boards
+                </span>
               </div>
-              <div className="text-xs text-slate-500">Searches Greenhouse, Lever, Workday, Ashby &amp; iCIMS directly</div>
+              <div className="text-xs text-slate-400 mt-0.5">Searches Greenhouse, Lever, Workday, Ashby &amp; iCIMS directly</div>
             </div>
             <Button
               loading={webSearchMut.isPending || isImportPolling}
@@ -273,7 +291,7 @@ export default function FindJobs() {
             />
           </div>
           {isImportPolling && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 font-medium">
               Searching ATS boards... this may take a few seconds
             </div>
           )}
@@ -281,8 +299,8 @@ export default function FindJobs() {
       </Card>
 
       <div className="flex items-center gap-3 mb-4">
-        <div className="h-7 w-7 rounded-full bg-brand-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">2</div>
-        <h2 className="text-base font-semibold text-slate-800">Score jobs against your profile</h2>
+        <StepIndicator number="2" active />
+        <h2 className="text-base font-semibold text-slate-700">Score jobs against your profile</h2>
       </div>
 
       <Card className="mb-6">
@@ -290,12 +308,12 @@ export default function FindJobs() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Zap className="h-4 w-4 text-amber-500" />
-              <span className="text-sm font-semibold text-slate-900">AI Match Scoring</span>
+              <span className="text-sm font-semibold text-slate-700">AI Match Scoring</span>
               {!profile && (
-                <span className="text-xs text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full">Upload resume first</span>
+                <span className="text-xs text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full font-semibold">Upload resume first</span>
               )}
             </div>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-400">
               Scores every imported job against your skills, experience, and target roles. Results appear sorted by fit in Job Matches.
             </p>
           </div>
@@ -318,15 +336,17 @@ export default function FindJobs() {
       </Card>
 
       <div className="flex items-center gap-3 mb-4">
-        <div className="h-7 w-7 rounded-full bg-slate-300 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">3</div>
-        <h2 className="text-base font-semibold text-slate-800">Add a job manually <span className="text-xs font-normal text-slate-400">(optional)</span></h2>
+        <StepIndicator number="3" active={false} />
+        <h2 className="text-base font-semibold text-slate-700">
+          Add a job manually <span className="text-xs font-normal text-slate-400">(optional)</span>
+        </h2>
       </div>
 
       <Card className="mb-6">
         <button className="flex items-center justify-between w-full text-left" onClick={() => setShowManual(v => !v)}>
           <div className="flex items-center gap-2">
-            <Plus className="h-4 w-4 text-brand-600" />
-            <span className="text-sm font-medium text-slate-700">Add a job you found elsewhere</span>
+            <Plus className="h-4 w-4 text-brand-500" />
+            <span className="text-sm font-semibold text-slate-600">Add a job you found elsewhere</span>
           </div>
           {showManual ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
         </button>

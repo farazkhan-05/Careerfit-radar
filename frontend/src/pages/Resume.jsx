@@ -32,10 +32,10 @@ function UploadZone({ onUpload, loading }) {
           handleFiles(e.dataTransfer.files)
         }}
         className={`
-          border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all duration-200
+          border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all duration-200
           ${dragging
             ? 'border-brand-400 bg-brand-50 scale-[1.01]'
-            : 'border-slate-200 hover:border-brand-300 hover:bg-slate-50'
+            : 'border-slate-200 hover:border-brand-300 hover:bg-slate-50/50'
           }
         `}
       >
@@ -46,20 +46,25 @@ function UploadZone({ onUpload, loading }) {
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />
-        <Upload className="h-8 w-8 text-brand-400 mx-auto mb-3" />
-        <p className="text-sm font-medium text-slate-700">
-          Drag & drop your resume here, or <span className="text-brand-600">click to browse</span>
+        <div
+          className="h-14 w-14 rounded-2xl flex items-center justify-center mx-auto mb-3"
+          style={{ background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)' }}
+        >
+          <Upload className="h-6 w-6 text-brand-500" />
+        </div>
+        <p className="text-sm font-semibold text-slate-700">
+          Drag &amp; drop your resume here, or <span className="text-brand-500">click to browse</span>
         </p>
-        <p className="text-xs text-slate-400 mt-1">PDF or DOCX supported</p>
+        <p className="text-xs text-slate-400 mt-1 font-medium">PDF or DOCX supported</p>
       </div>
 
       <div className="flex items-center justify-between">
-        <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-600">
+        <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-600">
           <input
             type="checkbox"
             checked={extractProfile}
             onChange={(e) => setExtractProfile(e.target.checked)}
-            className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+            className="rounded border-slate-300 text-brand-500 focus:ring-brand-400"
           />
           <Sparkles className="h-3.5 w-3.5 text-amber-500" />
           Extract my profile with AI
@@ -80,11 +85,11 @@ function ResumeRow({ resume, onDelete, deleting }) {
   return (
     <div className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
       <div className="flex items-center gap-3">
-        <div className="h-9 w-9 rounded-lg bg-brand-50 flex items-center justify-center">
-          <FileText className="h-4 w-4 text-brand-600" />
+        <div className="h-9 w-9 rounded-xl bg-brand-50 flex items-center justify-center">
+          <FileText className="h-4 w-4 text-brand-500" />
         </div>
         <div>
-          <div className="text-sm font-medium text-slate-800">{resume.file_name}</div>
+          <div className="text-sm font-semibold text-slate-700">{resume.file_name}</div>
           <div className="text-xs text-slate-400">{resume.content_type}</div>
         </div>
       </div>
@@ -93,7 +98,7 @@ function ResumeRow({ resume, onDelete, deleting }) {
         size="sm"
         loading={deleting}
         onClick={() => onDelete(resume.id)}
-        className="text-rose-500 hover:text-rose-600 hover:bg-rose-50"
+        className="text-rose-400 hover:text-rose-600 hover:bg-rose-50"
       >
         <Trash2 className="h-3.5 w-3.5" />
       </Button>
@@ -112,7 +117,7 @@ function ProfileCard({ profile }) {
   return (
     <div className="space-y-4">
       <div>
-        <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5">
+        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
           Target Roles
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -120,42 +125,42 @@ function ProfileCard({ profile }) {
             profile.target_roles.map((role) => (
               <span
                 key={role}
-                className="inline-flex px-2.5 py-1 rounded-full text-xs bg-brand-100 text-brand-700 font-medium"
+                className="inline-flex px-3 py-1 rounded-full text-xs bg-brand-100 text-brand-600 font-semibold"
               >
                 {role}
               </span>
             ))
           ) : (
-            <span className="text-xs text-slate-400">Not extracted</span>
+            <span className="text-xs text-slate-400 font-medium">Not extracted</span>
           )}
         </div>
       </div>
 
       {profile.experience_years != null && (
         <div>
-          <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">
+          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
             Experience
           </div>
-          <div className="text-sm text-slate-800">{profile.experience_years} years</div>
+          <div className="text-sm font-semibold text-slate-700">{profile.experience_years} years</div>
         </div>
       )}
 
       {allSkills.length > 0 && (
         <div>
-          <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5">
+          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
             Skills
           </div>
           <div className="flex flex-wrap gap-1.5">
             {allSkills.slice(0, 20).map((skill) => (
               <span
                 key={skill}
-                className="inline-flex px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-600"
+                className="inline-flex px-2.5 py-1 rounded-full text-xs bg-slate-100 text-slate-600 font-medium"
               >
                 {skill}
               </span>
             ))}
             {allSkills.length > 20 && (
-              <span className="text-xs text-slate-400">+{allSkills.length - 20} more</span>
+              <span className="text-xs text-slate-400 font-medium">+{allSkills.length - 20} more</span>
             )}
           </div>
         </div>
@@ -220,8 +225,8 @@ export default function Resume() {
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">My Resume</h1>
-        <p className="text-slate-500 mt-1">Upload your resume and let AI build your candidate profile</p>
+        <h1 className="text-2xl font-bold text-slate-800">My Resume</h1>
+        <p className="text-slate-400 mt-1 font-medium">Upload your resume and let AI build your candidate profile</p>
       </div>
 
       <div className="space-y-6">
@@ -312,7 +317,7 @@ export default function Resume() {
                     </Button>
                   )}
                   <div className="h-7 w-7 rounded-full bg-amber-100 flex items-center justify-center">
-                    <User className="h-4 w-4 text-amber-600" />
+                    <User className="h-4 w-4 text-amber-500" />
                   </div>
                 </div>
               }
@@ -332,7 +337,7 @@ export default function Resume() {
                     <button
                       onClick={() => deleteProfileMut.mutate(p.id)}
                       disabled={deleteProfileMut.isPending && deleteProfileMut.variables === p.id}
-                      className="absolute top-0 right-0 p-1 text-rose-400 hover:text-rose-600 transition-colors"
+                      className="absolute top-0 right-0 p-1 text-rose-400 hover:text-rose-600 transition-colors rounded-full hover:bg-rose-50"
                       title="Delete profile"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
