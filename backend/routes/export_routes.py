@@ -8,8 +8,13 @@ from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend.models import db_models
 from backend.routes.crud import rows_to_csv
+from backend.security import require_api_auth
 
-router = APIRouter(prefix="/exports", tags=["exports"])
+router = APIRouter(
+    prefix="/exports",
+    tags=["exports"],
+    dependencies=[Depends(require_api_auth)],
+)
 
 
 @router.get("/jobs.csv")
@@ -40,7 +45,13 @@ def export_jobs_csv(db: Session = Depends(get_db)) -> Response:
 
 @router.get("/applications.csv")
 def export_applications_csv(db: Session = Depends(get_db)) -> Response:
-    applications = db.execute(select(db_models.Application).order_by(db_models.Application.created_at.desc())).scalars().all()
+    applications = (
+        db.execute(
+            select(db_models.Application).order_by(db_models.Application.created_at.desc())
+        )
+        .scalars()
+        .all()
+    )
     payload = rows_to_csv(
         (
             {

@@ -22,5 +22,5 @@ export async function deleteApplication(applicationId) {
 }
 
 export async function deleteAllApplications() {
-  await apiClient.delete('/applications')
+  await apiClient.delete('/applications', { headers: { 'X-Confirm-Bulk-Delete': 'true' } })
 }

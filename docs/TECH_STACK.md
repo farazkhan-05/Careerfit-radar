@@ -23,7 +23,7 @@ This document defines the approved MVP technology stack. Only the technologies l
 | Validation             | Pydantic                               |
 | Embeddings             | gemini-embedding-2                     |
 | LLM                    | gemini-3.1-flash-lite                  |
-| Job Sources            | Greenhouse, Lever, Remotive, Arbeitnow |
+| Job Sources            | Approved ATS web search                |
 | Optional Source        | SmartRecruiters                        |
 | HTML Parsing           | BeautifulSoup                          |
 | HTTP Client            | httpx                                  |
@@ -99,13 +99,10 @@ Do not use the LLM for deterministic business logic.
 
 ### Job Sources
 
-Required:
+Current MVP:
 
 ```text
-Greenhouse
-Lever
-Remotive
-Arbeitnow
+Tavily web search constrained to approved ATS domains
 ```
 
 Optional:
@@ -215,7 +212,7 @@ careerfit-radar/
 │   │   └── export_service.py
 │   ├── sources/
 │   │   ├── base_source.py
-│   │   ├── apify_source.py
+│   │   ├── tavily_search_source.py
 │   │   └── smartrecruiters_source.py
 │   ├── workflows/
 │   │   └── job_discovery_graph.py

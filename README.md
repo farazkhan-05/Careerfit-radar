@@ -47,7 +47,7 @@ pip install -r requirements.txt
 
 # Copy and configure environment
 cp .env.example .env
-# Edit .env with your DATABASE_URL, GEMINI_API_KEY, etc.
+# Edit .env with your DATABASE_URL, GEMINI_API_KEY, API_AUTH_TOKEN, etc.
 
 # Run database migrations
 alembic upgrade head
@@ -68,7 +68,8 @@ npm install
 
 # Copy and configure environment
 cp .env.example .env
-# Set VITE_API_URL to point at your backend
+# Leave VITE_API_URL empty for the local /api proxy, or set it to your backend URL.
+# Set VITE_API_AUTH_TOKEN if the backend API_AUTH_TOKEN is enabled.
 
 # Start the development server
 npm run dev
@@ -85,18 +86,25 @@ The frontend runs on http://localhost:5173.
 | Variable               | Required | Default                 | Description                  |
 | ---------------------- | -------- | ----------------------- | ---------------------------- |
 | `DATABASE_URL`         | Yes      | —                       | PostgreSQL connection string  |
+| `API_AUTH_TOKEN`       | Production | —                     | Bearer token for protected API routes |
 | `GEMINI_API_KEY`       | Yes      | —                       | Google Gemini API key         |
 | `GEMINI_EMBEDDING_MODEL` | No     | `gemini-embedding-2`    | Embedding model name          |
 | `GEMINI_LLM_MODEL`     | No       | `gemini-3.1-flash-lite` | LLM model name                |
 | `CORS_ORIGINS`         | No       | `http://localhost:5173` | Comma-separated allowed origins |
 | `APP_ENV`              | No       | `development`           | Application environment       |
 | `LOG_LEVEL`            | No       | `INFO`                  | Log verbosity                 |
+| `MAX_UPLOAD_BYTES`     | No       | `10485760`              | Maximum resume upload size    |
+| `EMBEDDING_DIMENSIONS` | No       | unset                   | Optional embedding vector length validation |
 
 ### Frontend (`frontend/.env`)
 
 | Variable        | Required | Default                  | Description             |
 | --------------- | -------- | ------------------------ | ----------------------- |
-| `VITE_API_URL`  | No       | `http://localhost:8000`  | Backend API base URL    |
+| `VITE_API_URL`        | No       | `/api`                  | Backend API base URL or relative proxy path |
+| `VITE_API_AUTH_TOKEN` | No       | unset                   | Optional bearer token for local/private deployments |
+
+For the frontend Docker image, leave `VITE_API_URL` empty and set runtime `BACKEND_URL`
+to the backend service URL so Nginx can proxy `/api/*`.
 
 ---
 
@@ -113,9 +121,8 @@ docker run -p 8080:8080 --env-file .env careerfit-backend
 
 ```bash
 docker build -f Dockerfile.frontend \
-  --build-arg VITE_API_URL=http://your-backend-url \
   -t careerfit-frontend .
-docker run -p 8080:8080 careerfit-frontend
+docker run -p 8080:8080 -e BACKEND_URL=http://your-backend-url careerfit-frontend
 ```
 
 ---
@@ -151,7 +158,7 @@ mypy backend
 ## User Flow
 
 1. **Upload Resume** — Upload a PDF or DOCX resume. Gemini extracts your candidate profile.
-2. **Find Jobs** — Import jobs from Greenhouse, Lever, Remotive, or Arbeitnow. Add jobs manually.
+2. **Find Jobs** — Import jobs from approved ATS search results. Add jobs manually.
 3. **Review Matches** — Browse scored job matches. Filter by status or source.
 4. **Save Jobs** — Save jobs you want to track.
 5. **Track Applications** — Update application status as you progress through interviews.

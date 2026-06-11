@@ -30,5 +30,5 @@ export async function deleteJob(jobId) {
 }
 
 export async function deleteAllJobs() {
-  await apiClient.delete('/jobs')
+  await apiClient.delete('/jobs', { headers: { 'X-Confirm-Bulk-Delete': 'true' } })
 }

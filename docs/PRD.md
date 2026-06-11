@@ -40,7 +40,7 @@ The platform is not an outreach tool or auto-apply system.
 
 * Collect jobs from approved public sources:
 
-  * Apify-driven LinkedIn/Indeed integrations
+  * Approved ATS web-search integrations
 * Normalize and store job data.
 * Maintain source execution logs.
 
@@ -157,7 +157,7 @@ The MVP includes:
 
 * Resume upload and parsing
 * Candidate profile extraction
-* Apify-driven LinkedIn/Indeed integrations
+* Approved ATS web-search integrations
 * PostgreSQL storage with pgvector
 * Gemini embeddings
 * Gemini requirement extraction

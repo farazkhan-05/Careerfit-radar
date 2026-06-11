@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from functools import lru_cache
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
@@ -28,17 +29,27 @@ def create_session_factory(engine: Engine | None = None) -> sessionmaker[Session
     )
 
 
-SessionLocal = create_session_factory
+@lru_cache
+def get_engine() -> Engine:
+    return create_database_engine()
+
+
+@lru_cache
+def get_session_factory() -> sessionmaker[Session]:
+    return create_session_factory(get_engine())
+
+
+SessionLocal = get_session_factory
 
 
 def get_db() -> Generator[Session, None, None]:
-    session_factory = create_session_factory()
+    session_factory = get_session_factory()
     with session_factory() as session:
         yield session
 
 
 def test_database_connection(engine: Engine | None = None) -> bool:
-    active_engine = engine or create_database_engine()
+    active_engine = engine or get_engine()
     with active_engine.connect() as connection:
         connection.execute(text("SELECT 1"))
     return True

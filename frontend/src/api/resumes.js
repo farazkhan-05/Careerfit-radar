@@ -23,5 +23,5 @@ export async function deleteResume(resumeId) {
 }
 
 export async function deleteAllResumes() {
-  await apiClient.delete('/resumes')
+  await apiClient.delete('/resumes', { headers: { 'X-Confirm-Bulk-Delete': 'true' } })
 }

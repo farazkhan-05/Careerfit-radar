@@ -2,14 +2,24 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from backend.config import get_settings
+from backend.config import Settings, get_settings
 from backend.database import get_db
 from backend.models import db_models
-from backend.models.api_schemas import PageResponse, ResumeUploadResponse
+from backend.models.api_schemas import PageResponse, ResumeUpdate, ResumeUploadResponse
 from backend.models.schemas import ResumeCreate, ResumeRead
 from backend.routes.crud import (
     PaginationParams,
@@ -25,8 +35,13 @@ from backend.services.candidate_profile_service import (
     ProfileExtractionError,
 )
 from backend.services.resume_parser import ResumeParseError, parse_resume_bytes
+from backend.security import require_api_auth, require_bulk_delete_confirmation
 
-router = APIRouter(prefix="/resumes", tags=["resumes"])
+router = APIRouter(
+    prefix="/resumes",
+    tags=["resumes"],
+    dependencies=[Depends(require_api_auth)],
+)
 
 
 @router.post("/upload", response_model=ResumeUploadResponse, status_code=201)
@@ -34,8 +49,17 @@ async def upload_resume(
     file: UploadFile = File(...),
     extract_profile: bool = Form(default=False),
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> ResumeUploadResponse:
-    payload = await file.read()
+    payload = await file.read(settings.max_upload_bytes + 1)
+    if len(payload) > settings.max_upload_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=(
+                "Resume file is too large. "
+                f"Maximum size is {settings.max_upload_bytes} bytes."
+            ),
+        )
     try:
         parsed = parse_resume_bytes(
             file_name=file.filename or "resume",
@@ -70,20 +94,23 @@ async def upload_resume(
     profile_error = None
     if extract_profile:
         existing_profile = db.execute(
-            select(db_models.CandidateProfile).where(db_models.CandidateProfile.resume_id == resume.id)
+            select(db_models.CandidateProfile).where(
+                db_models.CandidateProfile.resume_id == resume.id
+            )
         ).scalar_one_or_none()
         if existing_profile is not None:
             profile_id = existing_profile.id
         else:
             try:
-                settings = get_settings()
                 profile_payload = CandidateProfileService(
                     GeminiProfileClient(
                         api_key=settings.gemini_api_key,
                         model=settings.gemini_llm_model,
                     )
                 ).extract_profile(resume_id=resume.id, resume_text=parsed.parsed_text)
-                profile = db_models.CandidateProfile(**profile_payload.model_dump(mode="json"))
+                profile = db_models.CandidateProfile(
+                    **profile_payload.model_dump(mode="json")
+                )
                 db.add(profile)
                 db.flush()
                 profile_id = profile.id
@@ -100,7 +127,10 @@ async def upload_resume(
 
 
 @router.post("", response_model=ResumeRead, status_code=201)
-def create_resume(payload: ResumeCreate, db: Session = Depends(get_db)) -> db_models.Resume:
+def create_resume(
+    payload: ResumeCreate,
+    db: Session = Depends(get_db),
+) -> db_models.Resume:
     return create_entity(db, db_models.Resume, payload)
 
 
@@ -109,7 +139,11 @@ def list_resumes(
     pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
-    return paginate(db, select(db_models.Resume).order_by(db_models.Resume.created_at.desc()), pagination)
+    return paginate(
+        db,
+        select(db_models.Resume).order_by(db_models.Resume.created_at.desc()),
+        pagination,
+    )
 
 
 @router.get("/{resume_id}", response_model=ResumeRead)
@@ -120,13 +154,22 @@ def get_resume(resume_id: UUID, db: Session = Depends(get_db)) -> db_models.Resu
 @router.patch("/{resume_id}", response_model=ResumeRead)
 def update_resume(
     resume_id: UUID,
-    payload: dict[str, object] = Body(...),
+    payload: ResumeUpdate = Body(...),
     db: Session = Depends(get_db),
 ) -> db_models.Resume:
-    return update_entity(db, db_models.Resume, resume_id, payload)
+    return update_entity(
+        db,
+        db_models.Resume,
+        resume_id,
+        payload.model_dump(exclude_unset=True),
+    )
 
 
-@router.delete("", status_code=204)
+@router.delete(
+    "",
+    status_code=204,
+    dependencies=[Depends(require_bulk_delete_confirmation)],
+)
 def delete_all_resumes(db: Session = Depends(get_db)):
     db.execute(delete(db_models.Resume))
     db.commit()

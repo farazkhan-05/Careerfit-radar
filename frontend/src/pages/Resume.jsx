@@ -9,7 +9,9 @@ import { PageSpinner } from '../components/ui/Spinner'
 import ErrorMessage, { SuccessMessage } from '../components/ui/ErrorMessage'
 import EmptyState from '../components/ui/EmptyState'
 
-function UploadZone({ onUpload, loading }) {
+const MAX_RESUME_BYTES = 10 * 1024 * 1024
+
+function UploadZone({ onUpload, onReject, loading }) {
   const fileRef = useRef(null)
   const [dragging, setDragging] = useState(false)
   const [extractProfile, setExtractProfile] = useState(true)
@@ -17,6 +19,10 @@ function UploadZone({ onUpload, loading }) {
   function handleFiles(files) {
     const file = files?.[0]
     if (!file) return
+    if (file.size > MAX_RESUME_BYTES) {
+      onReject(`Resume file is too large. Maximum size is ${Math.round(MAX_RESUME_BYTES / 1024 / 1024)}MB.`)
+      return
+    }
     onUpload(file, extractProfile)
   }
 
@@ -240,6 +246,7 @@ export default function Resume() {
             )}
             <UploadZone
               loading={uploadMut.isPending}
+              onReject={(message) => setUploadStatus({ type: 'error', message })}
               onUpload={(file, extractProfile) => {
                 setUploadStatus(null)
                 uploadMut.mutate({ file, extractProfile })

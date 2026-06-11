@@ -12,14 +12,22 @@ from backend.routes import (
     source_routes,
     workflow_routes,
 )
-
-app = FastAPI(title="CareerFit Radar")
+from backend.utils.logging_utils import configure_logging
 
 settings = get_settings()
+configure_logging(settings)
+production_like = settings.app_env.casefold() in {"production", "prod"}
+app = FastAPI(
+    title="CareerFit Radar",
+    docs_url=None if production_like else "/docs",
+    redoc_url=None if production_like else "/redoc",
+    openapi_url=None if production_like else "/openapi.json",
+)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -268,13 +268,10 @@ error_handler_node
 
 ### 6.4 Source Connectors
 
-#### Required Sources
+#### Current MVP Source
 
 ```text
-Greenhouse
-Lever
-Remotive
-Arbeitnow
+Tavily web search constrained to approved ATS domains
 ```
 
 #### Optional Sources
@@ -635,16 +632,19 @@ Preferences influence search, filtering, and scoring.
 
 ```text
 POST /resumes/upload
+GET /resumes
 GET /resumes/{resume_id}
-GET /resumes/{resume_id}/chunks
-POST /resumes/{resume_id}/reprocess
+PATCH /resumes/{resume_id}
+DELETE /resumes/{resume_id}
 ```
 
 #### Profile
 
 ```text
-GET /profile/current
-PUT /profile/preferences
+GET /profiles
+POST /profiles/score-jobs
+GET /profiles/{profile_id}
+PATCH /profiles/{profile_id}
 ```
 
 #### Jobs
@@ -652,18 +652,17 @@ PUT /profile/preferences
 ```text
 GET /jobs
 GET /jobs/{job_id}
-GET /jobs/{job_id}/score
-GET /jobs/{job_id}/requirements
-GET /jobs/{job_id}/similar
-POST /jobs/{job_id}/restore
+POST /jobs/manual
+PATCH /jobs/{job_id}
+DELETE /jobs/{job_id}
 ```
 
 #### Workflows
 
 ```text
-POST /workflows/job-refresh
+POST /workflows/run
 GET /workflows/{run_id}
-GET /workflows/{run_id}/logs
+PATCH /workflows/{workflow_id}
 ```
 
 #### Applications
@@ -677,9 +676,8 @@ PATCH /applications/{application_id}
 #### Sources
 
 ```text
-GET /sources
 GET /sources/runs
-POST /sources/{source_name}/refresh
+POST /sources/import/web-search
 ```
 
 #### Exports

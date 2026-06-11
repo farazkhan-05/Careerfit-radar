@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CalendarDays, ClipboardList, FilterX, Pencil, Save, StickyNote, Trash2, X } from 'lucide-react'
+import { Building2, CalendarDays, ClipboardList, ExternalLink, FilterX, MapPin, Pencil, Save, StickyNote, Trash2, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { listApplications, updateApplication, deleteApplication, deleteAllApplications } from '../api/applications'
 import { Card } from '../components/ui/Card'
@@ -47,6 +47,7 @@ function ApplicationCard({ application, onUpdate, onDelete }) {
   const [status, setStatus] = useState(application.status)
   const [notes, setNotes] = useState(application.notes ?? '')
   const [msg, setMsg] = useState(null)
+  const job = application.job
 
   async function handleSave() {
     try {
@@ -68,6 +69,23 @@ function ApplicationCard({ application, onUpdate, onDelete }) {
             <span className="truncate rounded-md bg-white px-2 py-1 text-xs font-mono font-bold text-muted">
               {application.job_id}
             </span>
+          </div>
+          <h3 className="font-display text-xl font-bold leading-tight text-ink">
+            {job?.title ?? 'Job details unavailable'}
+          </h3>
+          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-bold text-muted">
+            {job?.company_name && (
+              <span className="inline-flex items-center gap-1.5">
+                <Building2 className="h-4 w-4" />
+                {job.company_name}
+              </span>
+            )}
+            {job?.location && (
+              <span className="inline-flex items-center gap-1.5">
+                <MapPin className="h-4 w-4" />
+                {job.location}
+              </span>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             <DateTag label="Saved" value={application.created_at} />
@@ -102,6 +120,18 @@ function ApplicationCard({ application, onUpdate, onDelete }) {
           <StickyNote className="mr-2 inline h-4 w-4" />
           {application.notes}
         </p>
+      )}
+
+      {job?.apply_url && !editing && (
+        <a
+          href={job.apply_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 inline-flex min-h-8 items-center justify-center gap-2 rounded-lg border border-ink bg-ink px-3 py-1.5 text-xs font-bold text-white transition-all duration-150 hover:-translate-x-0.5 hover:-translate-y-0.5 hover:bg-[#0f1722] hover:shadow-button"
+        >
+          Open posting
+          <ExternalLink className="h-3.5 w-3.5" />
+        </a>
       )}
 
       {editing && (

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import csv
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
+from datetime import date, datetime
 from io import StringIO
 from typing import Any, Generic, TypeVar
 from uuid import UUID
@@ -64,7 +65,7 @@ def get_or_404(session: Session, model: type[ModelT], entity_id: UUID) -> ModelT
 
 
 def create_entity(session: Session, model: type[ModelT], payload: BaseModel) -> ModelT:
-    entity = model(**payload.model_dump(mode="json"))
+    entity = model(**_coerce_for_db(payload.model_dump()))
     session.add(entity)
     session.commit()
     session.refresh(entity)
@@ -75,12 +76,16 @@ def update_entity(
     session: Session,
     model: type[ModelT],
     entity_id: UUID,
-    payload: dict[str, Any],
+    payload: Mapping[str, Any],
 ) -> ModelT:
     entity = get_or_404(session, model, entity_id)
     for key, value in payload.items():
-        if value is not None and hasattr(entity, key):
-            setattr(entity, key, value)
+        if not hasattr(entity, key):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"{key} is not an updatable field.",
+            )
+        setattr(entity, key, _coerce_for_db(value))
     session.commit()
     session.refresh(entity)
     return entity
@@ -98,7 +103,7 @@ def rows_to_csv(rows: Iterable[dict[str, Any]], fieldnames: list[str]) -> str:
     writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
     writer.writeheader()
     for row in rows:
-        writer.writerow(row)
+        writer.writerow({key: _safe_csv_value(value) for key, value in row.items()})
     return output.getvalue()
 
 
@@ -116,3 +121,21 @@ def serialize_entity(entity: Any) -> dict[str, Any]:
         column.key: getattr(entity, column.key)
         for column in mapper.columns
     }
+
+
+def _coerce_for_db(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _coerce_for_db(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [_coerce_for_db(item) for item in value]
+    if isinstance(value, UUID | datetime | date | str | int | float | bool) or value is None:
+        return value
+    return str(value)
+
+
+def _safe_csv_value(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    if value.startswith(("=", "+", "-", "@", "\t", "\r")):
+        return f"'{value}"
+    return value

@@ -9,16 +9,30 @@ from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.models import db_models
-from backend.models.api_schemas import ManualJobCreate, PageResponse
+from backend.models.api_schemas import JobStatus, JobUpdate, ManualJobCreate, PageResponse
 from backend.models.schemas import CompanyCreate, CompanyRead, JobCreate, JobRead
-from backend.routes.crud import PaginationParams, create_entity, delete_entity, get_or_404, paginate, update_entity
+from backend.routes.crud import (
+    PaginationParams,
+    create_entity,
+    delete_entity,
+    get_or_404,
+    paginate,
+    update_entity,
+)
+from backend.security import require_api_auth, require_bulk_delete_confirmation
 
-router = APIRouter(prefix="/jobs", tags=["jobs"])
+router = APIRouter(
+    prefix="/jobs",
+    tags=["jobs"],
+    dependencies=[Depends(require_api_auth)],
+)
 
 
 @router.post("/companies", response_model=CompanyRead, status_code=201)
 def create_company(payload: CompanyCreate, db: Session = Depends(get_db)) -> db_models.Company:
-    existing = db.execute(select(db_models.Company).where(db_models.Company.name == payload.name)).scalar_one_or_none()
+    existing = db.execute(
+        select(db_models.Company).where(db_models.Company.name == payload.name)
+    ).scalar_one_or_none()
     if existing is not None:
         return existing
     return create_entity(db, db_models.Company, payload)
@@ -51,7 +65,7 @@ def create_manual_job(payload: ManualJobCreate, db: Session = Depends(get_db)) -
         title=payload.title,
         location=payload.location,
         remote_type=payload.remote_type,
-        apply_url=payload.apply_url,
+        apply_url=str(payload.apply_url),
         description=payload.description,
         raw_payload={"created_by": "manual"},
         fetched_at=datetime.now(UTC),
@@ -71,7 +85,7 @@ def create_job(payload: JobCreate, db: Session = Depends(get_db)) -> db_models.J
 @router.get("", response_model=PageResponse)
 def list_jobs(
     pagination: PaginationParams = Depends(),
-    status: str | None = Query(default=None),
+    status: JobStatus | None = Query(default=None),
     source: str | None = Query(default=None),
     q: str | None = Query(default=None),
     top_matches: bool = Query(default=False),
@@ -79,7 +93,9 @@ def list_jobs(
 ) -> dict[str, object]:
     # Resolve latest profile for score injection
     latest_profile_id = db.execute(
-        select(db_models.CandidateProfile.id).order_by(db_models.CandidateProfile.created_at.desc()).limit(1)
+        select(db_models.CandidateProfile.id)
+        .order_by(db_models.CandidateProfile.created_at.desc())
+        .limit(1)
     ).scalar_one_or_none()
 
     statement = select(db_models.Job)
@@ -114,17 +130,28 @@ def list_jobs(
         statement = statement.order_by(db_models.Job.fetched_at.desc())
 
     result = paginate(db, statement, pagination)
+    _inject_company_names(db, result["items"])
 
     # Inject match_score into each item dict
     if latest_profile_id is not None:
         job_ids = [item["id"] for item in result["items"]]
         if job_ids:
             scores = db.execute(
-                select(db_models.JobScore.job_id, db_models.JobScore.final_score, db_models.JobScore.explanation)
+                select(
+                    db_models.JobScore.job_id,
+                    db_models.JobScore.final_score,
+                    db_models.JobScore.explanation,
+                )
                 .where(db_models.JobScore.job_id.in_(job_ids))
                 .where(db_models.JobScore.candidate_profile_id == latest_profile_id)
             ).all()
-            score_map = {str(row.job_id): {"match_score": row.final_score, "match_explanation": row.explanation} for row in scores}
+            score_map = {
+                str(row.job_id): {
+                    "match_score": row.final_score,
+                    "match_explanation": row.explanation,
+                }
+                for row in scores
+            }
             for item in result["items"]:
                 info = score_map.get(str(item["id"]), {})
                 item["match_score"] = info.get("match_score")
@@ -143,11 +170,27 @@ def get_job(job_id: UUID, db: Session = Depends(get_db)) -> db_models.Job:
 
 
 @router.patch("/{job_id}", response_model=JobRead)
-def update_job(job_id: UUID, payload: dict[str, object] = Body(...), db: Session = Depends(get_db)) -> db_models.Job:
-    return update_entity(db, db_models.Job, job_id, payload)
+def update_job(
+    job_id: UUID,
+    payload: JobUpdate = Body(...),
+    db: Session = Depends(get_db),
+) -> db_models.Job:
+    changes = payload.model_dump(exclude_unset=True)
+    if changes.get("apply_url") is not None:
+        changes["apply_url"] = str(changes["apply_url"])
+    return update_entity(
+        db,
+        db_models.Job,
+        job_id,
+        changes,
+    )
 
 
-@router.delete("", status_code=204)
+@router.delete(
+    "",
+    status_code=204,
+    dependencies=[Depends(require_bulk_delete_confirmation)],
+)
 def delete_all_jobs(db: Session = Depends(get_db)):
     # Delete in FK-safe order; job deletion cascades to applications,
     # scores, embeddings, requirements, and rejected_jobs via DB constraints.
@@ -165,10 +208,26 @@ def delete_job(job_id: UUID, db: Session = Depends(get_db)):
 
 
 def _get_or_create_company(db: Session, name: str) -> db_models.Company:
-    company = db.execute(select(db_models.Company).where(db_models.Company.name == name)).scalar_one_or_none()
+    company = db.execute(
+        select(db_models.Company).where(db_models.Company.name == name)
+    ).scalar_one_or_none()
     if company is not None:
         return company
     company = db_models.Company(name=name, source_priority=3)
     db.add(company)
     db.flush()
     return company
+
+
+def _inject_company_names(db: Session, items: list[dict[str, object]]) -> None:
+    company_ids = {item.get("company_id") for item in items if item.get("company_id")}
+    if not company_ids:
+        return
+    companies = db.execute(
+        select(db_models.Company.id, db_models.Company.name).where(
+            db_models.Company.id.in_(company_ids)
+        )
+    ).all()
+    company_map = {row.id: row.name for row in companies}
+    for item in items:
+        item["company_name"] = company_map.get(item.get("company_id"))

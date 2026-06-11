@@ -15,7 +15,7 @@ export async function deleteProfile(profileId) {
 }
 
 export async function deleteAllProfiles() {
-  await apiClient.delete('/profiles')
+  await apiClient.delete('/profiles', { headers: { 'X-Confirm-Bulk-Delete': 'true' } })
 }
 
 export async function scoreJobs({ limit = 10, rescore = false } = {}) {

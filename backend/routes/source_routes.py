@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, Query, status
@@ -9,22 +9,46 @@ from sqlalchemy.orm import Session
 
 from backend.database import SessionLocal, get_db
 from backend.models import db_models
-from backend.models.api_schemas import PageResponse, SourceImportResponse, WebSearchImportRequest, WorkflowTriggerResponse
+from backend.models.api_schemas import (
+    PageResponse,
+    RunStatus,
+    SourceImportResponse,
+    SourceRunUpdate,
+    WebSearchImportRequest,
+    WorkflowTriggerResponse,
+)
 from backend.models.schemas import SourceRunCreate, SourceRunRead
-from backend.routes.crud import PaginationParams, create_entity, delete_entity, get_or_404, paginate, update_entity
+from backend.routes.crud import (
+    PaginationParams,
+    create_entity,
+    delete_entity,
+    get_or_404,
+    paginate,
+    update_entity,
+)
+from backend.security import require_api_auth
 from backend.sources.base_source import NormalizedJob, SourceStatus
 from backend.sources.tavily_search_source import TavilySearchSource
 from backend.workflows.job_discovery_graph import (
+    JobDiscoveryState,
     JobDiscoveryWorkflow,
     JobDiscoveryWorkflowDependencies,
     WorkflowRunRepository,
     create_initial_state,
 )
 
-router = APIRouter(prefix="/sources", tags=["sources"])
+router = APIRouter(
+    prefix="/sources",
+    tags=["sources"],
+    dependencies=[Depends(require_api_auth)],
+)
 
 
-@router.post("/import/web-search", response_model=WorkflowTriggerResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/import/web-search",
+    response_model=WorkflowTriggerResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 def import_web_search_jobs(
     background_tasks: BackgroundTasks,
     payload: WebSearchImportRequest | None = Body(default=None),
@@ -44,7 +68,12 @@ def import_web_search_jobs(
         )
     )
     db.commit()
-    background_tasks.add_task(_run_web_search_import_workflow, run_id, search.query, search.location)
+    background_tasks.add_task(
+        _run_web_search_import_workflow,
+        run_id,
+        search.query,
+        search.location,
+    )
     return WorkflowTriggerResponse(run_id=run_id, status="running", workflow_id=persisted.id)
 
 
@@ -69,13 +98,22 @@ def _run_web_search_import_workflow(run_id: str, query: str, location: str) -> N
             _mark_workflow_failed(db, repository, run_id, exc)
 
 
-def _fetch_and_store_web_search_jobs(db: Session, state: Mapping[str, Any]) -> dict[str, object]:
+def _fetch_and_store_web_search_jobs(
+    db: Session,
+    state: Mapping[str, Any],
+) -> dict[str, object]:
     source = TavilySearchSource()
     try:
         result = source.fetch_jobs(state=state)
     finally:
         source.close()
-    response = _store_source_result(db, result.source_name, result.status.value, result.jobs, result.error_message)
+    response = _store_source_result(
+        db,
+        result.source_name,
+        result.status.value,
+        result.jobs,
+        result.error_message,
+    )
     return response.model_dump(mode="json")
 
 
@@ -86,8 +124,10 @@ def _mark_workflow_failed(
     exc: Exception,
 ) -> None:
     existing = repository.get_run(run_id)
-    state = dict(existing.state) if existing is not None and isinstance(existing.state, dict) else create_initial_state(
-        {"run_id": run_id, "source_name": "tavily_search"}
+    state = (
+        dict(existing.state)
+        if existing is not None and isinstance(existing.state, dict)
+        else create_initial_state({"run_id": run_id, "source_name": "tavily_search"})
     )
     errors = list(state.get("errors", []))
     errors.append(
@@ -97,19 +137,23 @@ def _mark_workflow_failed(
             "timestamp": datetime_now().isoformat(),
         }
     )
+    failed_state = {
+        **state,
+        "status": "failed",
+        "completed_at": datetime_now().isoformat(),
+        "errors": errors,
+    }
     repository.save_state(
-        {
-            **state,
-            "status": "failed",
-            "completed_at": datetime_now().isoformat(),
-            "errors": errors,
-        }
+        cast(JobDiscoveryState, failed_state)
     )
     db.commit()
 
 
 @router.post("/runs", response_model=SourceRunRead, status_code=201)
-def create_source_run(payload: SourceRunCreate, db: Session = Depends(get_db)) -> db_models.SourceRun:
+def create_source_run(
+    payload: SourceRunCreate,
+    db: Session = Depends(get_db),
+) -> db_models.SourceRun:
     return create_entity(db, db_models.SourceRun, payload)
 
 
@@ -117,10 +161,12 @@ def create_source_run(payload: SourceRunCreate, db: Session = Depends(get_db)) -
 def list_source_runs(
     pagination: PaginationParams = Depends(),
     source_name: str | None = Query(default=None),
-    status: str | None = Query(default=None),
+    status: RunStatus | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
-    statement = select(db_models.SourceRun).order_by(db_models.SourceRun.started_at.desc())
+    statement = select(db_models.SourceRun).order_by(
+        db_models.SourceRun.started_at.desc()
+    )
     if source_name is not None:
         statement = statement.where(db_models.SourceRun.source_name == source_name)
     if status is not None:
@@ -129,13 +175,25 @@ def list_source_runs(
 
 
 @router.get("/runs/{source_run_id}", response_model=SourceRunRead)
-def get_source_run(source_run_id: UUID, db: Session = Depends(get_db)) -> db_models.SourceRun:
+def get_source_run(
+    source_run_id: UUID,
+    db: Session = Depends(get_db),
+) -> db_models.SourceRun:
     return get_or_404(db, db_models.SourceRun, source_run_id)
 
 
 @router.patch("/runs/{source_run_id}", response_model=SourceRunRead)
-def update_source_run(source_run_id: UUID, payload: dict[str, object] = Body(...), db: Session = Depends(get_db)) -> db_models.SourceRun:
-    return update_entity(db, db_models.SourceRun, source_run_id, payload)
+def update_source_run(
+    source_run_id: UUID,
+    payload: SourceRunUpdate = Body(...),
+    db: Session = Depends(get_db),
+) -> db_models.SourceRun:
+    return update_entity(
+        db,
+        db_models.SourceRun,
+        source_run_id,
+        payload.model_dump(exclude_unset=True),
+    )
 
 
 @router.delete("/runs/{source_run_id}", status_code=204)
@@ -201,7 +259,9 @@ def _store_source_result(
 
 
 def _get_or_create_company(db: Session, name: str) -> db_models.Company:
-    company = db.execute(select(db_models.Company).where(db_models.Company.name == name)).scalar_one_or_none()
+    company = db.execute(
+        select(db_models.Company).where(db_models.Company.name == name)
+    ).scalar_one_or_none()
     if company is not None:
         return company
     company = db_models.Company(name=name, source_priority=3)

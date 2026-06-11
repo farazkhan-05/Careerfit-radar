@@ -5,7 +5,7 @@ import { Card, CardHeader } from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { PageSpinner } from '../components/ui/Spinner'
 
-const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+const apiUrl = import.meta.env.VITE_API_URL || '/api'
 
 function StatusRow({ label, status, detail }) {
   const ok = status === 'ok' || status === 'configured'

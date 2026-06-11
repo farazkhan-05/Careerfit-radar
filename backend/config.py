@@ -8,6 +8,17 @@ class Settings(BaseSettings):
     database_url: str = Field(..., alias="DATABASE_URL")
     gemini_api_key: str = Field(..., alias="GEMINI_API_KEY")
     tavily_api_key: str = Field(default="", alias="TAVILY_API_KEY")
+    api_auth_token: str | None = Field(default=None, alias="API_AUTH_TOKEN")
+    max_upload_bytes: int = Field(
+        default=10 * 1024 * 1024,
+        gt=0,
+        alias="MAX_UPLOAD_BYTES",
+    )
+    embedding_dimensions: int | None = Field(
+        default=None,
+        gt=0,
+        alias="EMBEDDING_DIMENSIONS",
+    )
     gemini_embedding_model: str = Field(
         default="gemini-embedding-2",
         alias="GEMINI_EMBEDDING_MODEL",

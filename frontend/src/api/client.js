@@ -1,6 +1,7 @@
 import axios from 'axios'
 
 const baseURL = import.meta.env.VITE_API_URL || '/api'
+const apiAuthToken = import.meta.env.VITE_API_AUTH_TOKEN
 
 const apiClient = axios.create({
   baseURL,
@@ -8,6 +9,10 @@ const apiClient = axios.create({
 })
 
 apiClient.interceptors.request.use((config) => {
+  config.headers = config.headers ?? {}
+  if (apiAuthToken) {
+    config.headers.Authorization = `Bearer ${apiAuthToken}`
+  }
   if (!(config.data instanceof FormData)) {
     config.headers['Content-Type'] = 'application/json'
   }

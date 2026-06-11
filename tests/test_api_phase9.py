@@ -99,7 +99,15 @@ def _client_with_session(session: FakeSession) -> TestClient:
     def override_db() -> Any:
         yield session
 
+    def override_settings() -> Settings:
+        return Settings(
+            DATABASE_URL="postgresql://user:pass@example.com:5432/careerfit",
+            GEMINI_API_KEY="test-key",
+            APP_ENV="development",
+        )
+
     app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[get_settings] = override_settings
     return TestClient(app)
 
 
@@ -164,7 +172,7 @@ def test_phase9_routers_are_registered() -> None:
     assert "/workflows" in paths
     assert "/applications" in paths
     assert "/sources/runs" in paths
-    assert "/sources/import/apify" in paths
+    assert "/sources/import/web-search" in paths
     assert "/exports/jobs.csv" in paths
     assert "/health/ready" in paths
 
@@ -233,13 +241,13 @@ def test_csv_export_returns_jobs_csv() -> None:
     assert "Backend Engineer" in response.text
 
 
-def test_apify_import_route_queues_background_workflow(monkeypatch: Any) -> None:
+def test_web_search_import_route_queues_background_workflow(monkeypatch: Any) -> None:
     session = FakeSession()
     client = _client_with_session(session)
     captured: dict[str, Any] = {}
 
-    class FakeApifySource:
-        source_name = "apify"
+    class FakeTavilySource:
+        source_name = "tavily_search"
 
         def fetch_jobs(self, *, state: dict[str, Any] | None = None) -> SourceFetchResult:
             captured["state"] = state
@@ -254,17 +262,17 @@ def test_apify_import_route_queues_background_workflow(monkeypatch: Any) -> None
         def close(self) -> None:
             captured["closed"] = True
 
-    monkeypatch.setattr(source_routes, "ApifySource", FakeApifySource)
+    monkeypatch.setattr(source_routes, "TavilySearchSource", FakeTavilySource)
     monkeypatch.setattr(source_routes, "SessionLocal", lambda: FakeSessionFactory(session))
 
     response = client.post(
-        "/sources/import/apify",
+        "/sources/import/web-search",
         json={"query": "React Engineer", "location": "Bengaluru, India"},
     )
 
     assert response.status_code == 202
     assert response.json()["status"] == "running"
-    assert response.json()["run_id"].startswith("apify-")
+    assert response.json()["run_id"].startswith("tavily-search-")
     assert captured["state"]["search"] == {"query": "React Engineer", "location": "Bengaluru, India"}
     assert captured["closed"] is True
     workflow_run = next(iter(session.entities[db_models.WorkflowRun].values()))
@@ -276,20 +284,20 @@ def test_apify_import_route_queues_background_workflow(monkeypatch: Any) -> None
 def test_workflow_run_can_be_read_by_run_id() -> None:
     session = FakeSession()
     workflow_run = db_models.WorkflowRun(
-        run_id="apify-test-run",
-        source_name="apify",
+        run_id="tavily-test-run",
+        source_name="tavily_search",
         status="running",
         started_at=datetime.now(UTC),
-        state={"run_id": "apify-test-run", "status": "running"},
+        state={"run_id": "tavily-test-run", "status": "running"},
         errors=[],
     )
     session.add(workflow_run)
     client = _client_with_session(session)
 
-    response = client.get("/workflows/apify-test-run")
+    response = client.get("/workflows/tavily-test-run")
 
     assert response.status_code == 200
-    assert response.json()["run_id"] == "apify-test-run"
+    assert response.json()["run_id"] == "tavily-test-run"
 
 
 def test_score_jobs_respects_batch_limit_and_returns_remaining_count(monkeypatch: Any) -> None:

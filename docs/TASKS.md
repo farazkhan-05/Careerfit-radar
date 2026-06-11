@@ -99,14 +99,14 @@ backend/services/candidate_profile_service.py
 
 ```text
 backend/sources/base_source.py
-backend/sources/apify_source.py
+backend/sources/tavily_search_source.py
 backend/sources/smartrecruiters_source.py
 ```
 
 ### Deliverables
 
 * Create common source interface.
-* Implement Greenhouse, Lever, Remotive, and Arbeitnow connectors.
+* Implement approved ATS web-search import.
 * Add optional SmartRecruiters connector.
 
 ### Acceptance Criteria
@@ -382,10 +382,11 @@ Settings (health + exports)
 
 ## Job Discovery
 
-* [x] Greenhouse connector implemented
-* [x] Lever connector implemented
-* [x] Remotive connector implemented
-* [x] Arbeitnow connector implemented
+* [x] Approved ATS web-search import implemented
+* [ ] Dedicated Greenhouse connector implemented
+* [ ] Dedicated Lever connector implemented
+* [ ] Dedicated Remotive connector implemented
+* [ ] Dedicated Arbeitnow connector implemented
 * [x] Hard filtering implemented
 * [x] Deduplication implemented
 
@@ -420,8 +421,8 @@ Settings (health + exports)
 
 ## Production Readiness
 
-* [x] Tests passing
-* [x] Ruff passing
-* [x] MyPy passing
+* [ ] Tests passing
+* [ ] Ruff passing
+* [ ] MyPy passing
 * [ ] GCP deployment completed
 * [ ] Production health checks passing

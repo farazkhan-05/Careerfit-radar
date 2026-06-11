@@ -4,7 +4,7 @@ import logging
 import re
 from datetime import UTC, datetime
 from hashlib import sha256
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 from urllib.parse import urlparse
 
 import requests
@@ -168,7 +168,8 @@ class TavilySearchSource(JobSource):
                 ui_location,
             )
 
-        usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
+        usage_payload = data.get("usage")
+        usage = usage_payload if isinstance(usage_payload, dict) else {}
         return jobs, {
             "search_query": search_query,
             "fetched_count": len(jobs),
@@ -203,7 +204,7 @@ class TavilySearchSource(JobSource):
                 location=ui_location,
                 remote_type=infer_remote_type(content, title),
                 posted_at=None,
-                apply_url=apply_url,
+                apply_url=cast(Any, apply_url),
                 description=content,
                 source_metadata={
                     "search_query": ui_query,

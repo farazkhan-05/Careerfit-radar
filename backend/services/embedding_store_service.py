@@ -8,6 +8,7 @@ from sqlalchemy import Select, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from backend.config import Settings
 from backend.models.db_models import Job, JobEmbedding, ResumeEmbedding
 
 
@@ -37,8 +38,18 @@ class SimilaritySearchResult:
 
 
 class EmbeddingStoreService:
-    def __init__(self, session: Session) -> None:
+    def __init__(
+        self,
+        session: Session,
+        settings: Settings | None = None,
+        expected_dimensions: int | None = None,
+    ) -> None:
         self._session = session
+        self._expected_dimensions = (
+            expected_dimensions
+            if expected_dimensions is not None
+            else settings.embedding_dimensions if settings is not None else None
+        )
 
     def store_resume_embedding(
         self,
@@ -49,8 +60,7 @@ class EmbeddingStoreService:
         embedding_vector: list[float],
         entity_type: str = "resume_chunk",
     ) -> StoredEmbedding:
-        if not embedding_vector:
-            raise EmbeddingStoreError("Embedding vector must not be empty.")
+        self._validate_embedding_vector(embedding_vector)
 
         existing = self._session.execute(
             select(ResumeEmbedding).where(
@@ -96,8 +106,7 @@ class EmbeddingStoreService:
         text_hash: str,
         embedding_vector: list[float],
     ) -> StoredEmbedding:
-        if not embedding_vector:
-            raise EmbeddingStoreError("Embedding vector must not be empty.")
+        self._validate_embedding_vector(embedding_vector)
 
         existing = self._session.execute(
             select(JobEmbedding).where(
@@ -146,6 +155,7 @@ class EmbeddingStoreService:
     ) -> tuple[SimilaritySearchResult, ...]:
         if not query_vector or limit <= 0:
             return ()
+        self._validate_embedding_vector(query_vector)
 
         distance = JobEmbedding.embedding_vector.cosine_distance(query_vector)
         statement = (
@@ -180,6 +190,16 @@ class EmbeddingStoreService:
             if minimum_score is None or result.score >= minimum_score:
                 results.append(result)
         return tuple(results)
+
+    def _validate_embedding_vector(self, embedding_vector: list[float]) -> None:
+        if not embedding_vector:
+            raise EmbeddingStoreError("Embedding vector must not be empty.")
+        expected_dimensions = self._expected_dimensions
+        if expected_dimensions is not None and len(embedding_vector) != expected_dimensions:
+            raise EmbeddingStoreError(
+                "Embedding vector dimension mismatch: "
+                f"expected {expected_dimensions}, got {len(embedding_vector)}."
+            )
 
 
 def build_similarity_statement(
