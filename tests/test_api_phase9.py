@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 from starlette.routing import Route
 
 from backend.config import Settings, get_settings
@@ -256,7 +257,7 @@ def test_web_search_import_route_queues_background_workflow(monkeypatch: Any) ->
                 status=SourceStatus.SUCCESS,
                 started_at=datetime.now(UTC),
                 completed_at=datetime.now(UTC),
-                jobs=[],
+                jobs=(),
             )
 
         def close(self) -> None:
@@ -336,7 +337,7 @@ def test_score_jobs_respects_batch_limit_and_returns_remaining_count(monkeypatch
 
     monkeypatch.setattr(profile_routes, "FitScoringService", FakeFitScoringService)
 
-    response = profile_routes.score_jobs(limit=2, db=session)
+    response = profile_routes.score_jobs(limit=2, db=cast(Session, session))
 
     assert response["scored_count"] == 2
     assert response["scored"] == 2
@@ -393,7 +394,7 @@ def test_score_jobs_prefers_database_requirements(monkeypatch: Any) -> None:
     monkeypatch.setattr(profile_routes, "FitScoringService", FakeFitScoringService)
     monkeypatch.setattr(profile_routes, "_infer_requirements", fail_infer_requirements)
 
-    response = profile_routes.score_jobs(limit=1, db=session)
+    response = profile_routes.score_jobs(limit=1, db=cast(Session, session))
 
     requirements = captured["requirements"]
     assert response["scored_count"] == 1

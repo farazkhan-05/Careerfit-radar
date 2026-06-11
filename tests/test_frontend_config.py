@@ -23,6 +23,14 @@ def test_frontend_vite_config_exists() -> None:
     assert (FRONTEND_ROOT / "vite.config.js").exists(), "frontend/vite.config.js must exist"
 
 
+def test_frontend_vite_proxy_forwards_backend_auth_token() -> None:
+    content = (FRONTEND_ROOT / "vite.config.js").read_text()
+
+    assert "loadEnv" in content, "Vite config must load root env for dev proxy settings"
+    assert "API_AUTH_TOKEN" in content, "Vite proxy must read backend API_AUTH_TOKEN"
+    assert "setHeader('Authorization'" in content, "Vite proxy must forward auth to backend"
+
+
 def test_frontend_src_entry_exists() -> None:
     assert (FRONTEND_ROOT / "src" / "main.jsx").exists(), "frontend/src/main.jsx must exist"
 

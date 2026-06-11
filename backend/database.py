@@ -12,10 +12,17 @@ class Base(DeclarativeBase):
     pass
 
 
+def normalize_database_url(database_url: str) -> str:
+    """Use the installed psycopg v3 SQLAlchemy driver for generic Postgres URLs."""
+    if database_url.startswith("postgresql://"):
+        return database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+    return database_url
+
+
 def create_database_engine(settings: Settings | None = None) -> Engine:
     active_settings = settings or get_settings()
     return create_engine(
-        active_settings.database_url,
+        normalize_database_url(active_settings.database_url),
         pool_pre_ping=True,
         future=True,
     )

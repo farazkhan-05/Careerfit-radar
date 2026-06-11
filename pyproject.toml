@@ -1,0 +1,32 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = [
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "frontend",
+    "tmp",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = [
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "frontend",
+    "tmp",
+]
+
+[tool.mypy]
+python_version = "3.12"
+exclude = [
+    "^\\.venv/",
+    "^frontend/",
+    "^tmp/",
+]

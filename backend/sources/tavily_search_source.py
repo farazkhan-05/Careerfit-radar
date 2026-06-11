@@ -4,7 +4,7 @@ import logging
 import re
 from datetime import UTC, datetime
 from hashlib import sha256
-from typing import Any, Mapping, cast
+from typing import Any, Mapping, Protocol, cast
 from urllib.parse import urlparse
 
 import requests
@@ -39,6 +39,25 @@ class TavilyProviderError(RuntimeError):
     """Sanitized provider error that never includes API keys."""
 
 
+class TavilyHttpResponse(Protocol):
+    status_code: int
+
+    def json(self) -> Any: ...
+
+
+class TavilyHttpSession(Protocol):
+    def post(
+        self,
+        url: str,
+        *,
+        json: Mapping[str, Any],
+        headers: Mapping[str, str],
+        timeout: int,
+    ) -> TavilyHttpResponse: ...
+
+    def close(self) -> None: ...
+
+
 class TavilySearchSource(JobSource):
     source_name = "tavily_search"
     timeout_seconds = 25.0
@@ -49,7 +68,7 @@ class TavilySearchSource(JobSource):
         self,
         *,
         api_key: str | None = None,
-        http_session: requests.Session | None = None,
+        http_session: TavilyHttpSession | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -218,7 +237,7 @@ class TavilySearchSource(JobSource):
             return None
 
 
-def _raise_for_tavily_error(response: requests.Response) -> None:
+def _raise_for_tavily_error(response: TavilyHttpResponse) -> None:
     if 200 <= response.status_code < 300:
         return
 

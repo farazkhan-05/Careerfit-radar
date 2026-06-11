@@ -3,7 +3,7 @@ from typing import Any, cast
 from uuid import uuid4
 
 from backend.config import Settings
-from backend.database import Base, create_database_engine
+from backend.database import Base, create_database_engine, normalize_database_url
 from backend.models import db_models
 from backend.models.schemas import (
     CandidateProfileCreate,
@@ -29,6 +29,14 @@ def test_database_config_loads_postgresql_engine() -> None:
 
     assert engine.url.drivername == "postgresql+psycopg"
     engine.dispose()
+
+
+def test_database_url_normalizes_generic_postgresql_to_installed_driver() -> None:
+    database_url = "postgresql://user:pass@example.com:5432/careerfit?sslmode=require"
+
+    normalized = normalize_database_url(database_url)
+
+    assert normalized == "postgresql+psycopg://user:pass@example.com:5432/careerfit?sslmode=require"
 
 
 def test_models_import_and_register_expected_tables() -> None:
