@@ -104,7 +104,10 @@ The frontend runs on http://localhost:5173.
 | `VITE_API_AUTH_TOKEN` | No       | unset                   | Optional bearer token for local/private deployments |
 
 For the frontend Docker image, leave `VITE_API_URL` empty and set runtime `BACKEND_URL`
-to the backend service URL so Nginx can proxy `/api/*`.
+to the backend service URL so Nginx can proxy `/api/*`. In production, set
+runtime `API_AUTH_TOKEN` from Secret Manager on the frontend service so Nginx can
+authenticate backend API requests without exposing the token in browser
+JavaScript.
 
 ---
 
@@ -124,6 +127,11 @@ docker build -f Dockerfile.frontend \
   -t careerfit-frontend .
 docker run -p 8080:8080 -e BACKEND_URL=http://your-backend-url careerfit-frontend
 ```
+
+### GCP deployment
+
+See [`docs/DEPLOYMENT_GCP.md`](docs/DEPLOYMENT_GCP.md) for the Cloud Run,
+Secret Manager, Cloud Scheduler, and Cloud Logging deployment runbook.
 
 ---
 
@@ -174,7 +182,7 @@ Key endpoint groups:
 - `POST /resumes/upload` — Upload and parse a resume
 - `GET /jobs` — List jobs with optional search/filter
 - `POST /sources/import/{source}` — Import jobs from a source
-- `POST /workflows/run` — Trigger the AI matching workflow
+- `POST /sources/import/web-search` — Trigger the scheduled job discovery workflow
 - `GET /applications` — List tracked applications
 - `GET /exports/jobs.csv` — Export job data as CSV
 - `GET /health/ready` — Health check with database and Gemini status

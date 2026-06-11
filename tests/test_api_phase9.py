@@ -104,6 +104,7 @@ def _client_with_session(session: FakeSession) -> TestClient:
         return Settings(
             DATABASE_URL="postgresql://user:pass@example.com:5432/careerfit",
             GEMINI_API_KEY="test-key",
+            API_AUTH_TOKEN=None,
             APP_ENV="development",
         )
 

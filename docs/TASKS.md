@@ -424,5 +424,5 @@ Settings (health + exports)
 * [x] Tests passing
 * [x] Ruff passing
 * [x] MyPy passing
-* [ ] GCP deployment completed
-* [ ] Production health checks passing
+* [x] GCP deployment completed
+* [x] Production health checks passing
