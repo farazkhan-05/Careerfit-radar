@@ -62,3 +62,20 @@ def test_backend_main_has_cors_middleware() -> None:
     main_path = Path(__file__).parent.parent / "backend" / "main.py"
     content = main_path.read_text()
     assert "CORSMiddleware" in content, "backend/main.py must configure CORSMiddleware"
+
+
+def test_frontend_container_renders_nginx_template_at_runtime() -> None:
+    dockerfile = (Path(__file__).parent.parent / "Dockerfile.frontend").read_text()
+    entrypoint = FRONTEND_ROOT / "docker-entrypoint.sh"
+    entrypoint_content = entrypoint.read_text()
+    nginx_template = (FRONTEND_ROOT / "nginx.conf").read_text()
+
+    assert entrypoint.exists(), "frontend container must include a runtime entrypoint"
+    assert "envsubst" in entrypoint_content, "entrypoint must render nginx template env vars"
+    assert "nginx -t" in entrypoint_content, "entrypoint must validate nginx config"
+    assert "nginx -T" not in entrypoint_content, "entrypoint must not log secrets in active nginx config"
+    assert "proxy_ssl_server_name on" in nginx_template, "Cloud Run upstream TLS must use backend SNI"
+    assert "proxy_set_header Host $proxy_host" in nginx_template, "Cloud Run upstream Host must target backend"
+    assert "proxy_set_header X-Forwarded-Host $host" in nginx_template
+    assert "ENTRYPOINT" in dockerfile, "Dockerfile.frontend must use the custom entrypoint"
+    assert "/docker-entrypoint-careerfit.sh" in dockerfile

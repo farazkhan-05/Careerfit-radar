@@ -12,5 +12,7 @@ ENV BACKEND_URL=http://localhost:8000
 ENV API_AUTH_TOKEN=
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY frontend/nginx.conf /etc/nginx/templates/default.conf.template
+COPY frontend/docker-entrypoint.sh /docker-entrypoint-careerfit.sh
 EXPOSE 8080
+ENTRYPOINT ["/bin/sh", "/docker-entrypoint-careerfit.sh"]
 CMD ["nginx", "-g", "daemon off;"]
