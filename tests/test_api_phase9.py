@@ -168,6 +168,7 @@ def teardown_function() -> None:
 def test_phase9_routers_are_registered() -> None:
     paths = {route.path for route in app.routes if isinstance(route, Route)}
 
+    assert "/" in paths
     assert "/resumes" in paths
     assert "/profiles" in paths
     assert "/jobs" in paths
@@ -177,6 +178,16 @@ def test_phase9_routers_are_registered() -> None:
     assert "/sources/import/web-search" in paths
     assert "/exports/jobs.csv" in paths
     assert "/health/ready" in paths
+
+
+def test_root_route_returns_api_metadata() -> None:
+    client = _client_with_session(FakeSession())
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert response.json()["service"] == "CareerFit Radar API"
+    assert response.json()["endpoints"]["readiness"] == "/health/ready"
 
 
 def test_resume_crud_routes_function_with_pagination() -> None:

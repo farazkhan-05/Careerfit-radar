@@ -33,6 +33,19 @@ app.add_middleware(
 )
 
 
+@app.get("/", tags=["health"])
+def root() -> dict[str, object]:
+    return {
+        "service": "CareerFit Radar API",
+        "status": "ok",
+        "endpoints": {
+            "health": "/health",
+            "liveness": "/health/live",
+            "readiness": "/health/ready",
+        },
+    }
+
+
 @app.get("/health", tags=["health"])
 def health() -> dict[str, str]:
     return {"status": "ok"}
