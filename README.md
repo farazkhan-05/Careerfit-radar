@@ -1,188 +1,175 @@
-# CareerFit Radar
+# CareerFit Radar - Full-stack RAG pipeline for job discovery
 
-CareerFit Radar is an AI-powered job intelligence platform that helps job seekers find, evaluate, and prioritize high-fit opportunities.
+CareerFit Radar is a full-stack job search project that connects resume parsing, job discovery, semantic matching, fit scoring, and application tracking in one workflow.
 
-The platform discovers jobs from approved public sources, compares them against your resume using semantic matching, scores each job for fit, identifies skill gaps, and helps you track your application pipeline.
+The goal is simple: upload a resume, bring in relevant job listings, compare each role against the candidate profile, and keep track of the jobs that are worth acting on. It is built as a practical solo developer project with production minded pieces such as API auth, migrations, tests, Docker builds, Cloud Run deployment, scheduled search, and secret management.
 
----
+## What It Does
+
+- Uploads PDF, DOCX, or text resumes and stores parsed resume content.
+- Extracts a candidate profile from resume text with Gemini.
+- Generates embeddings for resume chunks and job data.
+- Imports jobs from Tavily web search constrained to approved sources.
+- Filters unsuitable listings and deduplicates repeated jobs.
+- Scores job fit using skills, role match, semantic similarity, experience, freshness, location, and source quality.
+- Produces gap analysis for stronger and weaker matches.
+- Tracks saved jobs and application status.
+- Exports job and application data as CSV.
+- Runs locally with Docker or as separate frontend and backend services on Google Cloud Run.
 
 ## Tech Stack
 
-| Layer      | Technology                            |
-| ---------- | ------------------------------------- |
-| Backend    | FastAPI (Python 3.11+)                |
-| Frontend   | React 18 + Vite + Tailwind CSS        |
-| Database   | Neon PostgreSQL + pgvector            |
-| AI         | Gemini (embedding + LLM)              |
-| Workflows  | LangGraph                             |
-| Deployment | Google Cloud Run + Docker             |
+| Area | Tools |
+| --- | --- |
+| Frontend | React 18, Vite, Tailwind CSS, TanStack Query, Axios |
+| Backend | FastAPI, Python 3.11+, Pydantic |
+| Database | Neon PostgreSQL, pgvector |
+| ORM and migrations | SQLAlchemy, Alembic |
+| AI and matching | Gemini embeddings, Gemini LLM, resume and job matching with retrieval context |
+| Workflow | LangGraph |
+| Job discovery | Tavily web search with approved source constraints |
+| Deployment | Docker, Google Cloud Run, Cloud Build, Secret Manager, Cloud Scheduler |
+| Quality | pytest, Ruff, mypy |
 
----
+## Architecture
+
+```text
+React dashboard
+  -> FastAPI backend
+  -> LangGraph job discovery workflow
+  -> Gemini extraction, embeddings, scoring, and gap analysis
+  -> PostgreSQL with pgvector
+```
+
+The frontend and backend are deployed separately. The browser calls the frontend on `/api/*`, and the frontend container proxies those requests to the backend through Nginx. In production, the backend token stays in the Cloud Run environment instead of being exposed in browser JavaScript.
 
 ## Project Structure
 
-```
+```text
 careerfit-radar/
-├── backend/          FastAPI backend (routes, services, workflows)
-├── frontend/         React frontend (Vite + Tailwind CSS)
-├── docs/             Architecture, PRD, and task documentation
-├── tests/            Python backend tests
-├── migrations/       Alembic database migrations
-├── exports/          CSV export output directory
-├── Dockerfile.backend
-├── Dockerfile.frontend
-├── requirements.txt  Python dependencies (backend)
-└── .env.example      Backend environment variable template
+|-- backend/              FastAPI routes, services, sources, and workflows
+|-- frontend/             React app, API client, pages, and Nginx config
+|-- docs/                 PRD, architecture, deployment, and task notes
+|-- migrations/           Alembic database migrations
+|-- tests/                Backend and configuration tests
+|-- exports/              CSV export output directory
+|-- deploy/gcp/           Cloud Build configs
+|-- scripts/              Deployment and secret sync scripts
+|-- Dockerfile.backend
+|-- Dockerfile.frontend
+|-- requirements.txt
+|-- .env.example
 ```
 
----
-
-## Quick Start
+## Local Setup
 
 ### Backend
 
 ```bash
-# Install Python dependencies
 pip install -r requirements.txt
-
-# Copy and configure environment
 cp .env.example .env
-# Edit .env with your DATABASE_URL, GEMINI_API_KEY, API_AUTH_TOKEN, etc.
-
-# Run database migrations
 alembic upgrade head
-
-# Start the backend
 fastapi dev backend/main.py
 ```
 
-The backend runs on http://localhost:8000. Interactive API docs are at http://localhost:8000/docs.
+The backend runs at `http://localhost:8000`. In development, API docs are available at `http://localhost:8000/docs`.
 
 ### Frontend
 
 ```bash
 cd frontend
-
-# Install Node dependencies
 npm install
-
-# Copy and configure environment
 cp .env.example .env
-# Leave VITE_API_URL empty for the local /api proxy, or set it to your backend URL.
-# Set VITE_API_AUTH_TOKEN if the backend API_AUTH_TOKEN is enabled.
-
-# Start the development server
 npm run dev
 ```
 
-The frontend runs on http://localhost:5173.
+The frontend runs at `http://localhost:5173`.
 
----
+For local development, leave `VITE_API_URL` empty to use the Vite `/api` proxy. If backend auth is enabled locally, set `VITE_API_AUTH_TOKEN` to match `API_AUTH_TOKEN`.
 
 ## Environment Variables
 
-### Backend (`.env`)
+### Backend `.env`
 
-| Variable               | Required | Default                 | Description                  |
-| ---------------------- | -------- | ----------------------- | ---------------------------- |
-| `DATABASE_URL`         | Yes      | —                       | PostgreSQL connection string  |
-| `API_AUTH_TOKEN`       | Production | —                     | Bearer token for protected API routes |
-| `GEMINI_API_KEY`       | Yes      | —                       | Google Gemini API key         |
-| `GEMINI_EMBEDDING_MODEL` | No     | `gemini-embedding-2`    | Embedding model name          |
-| `GEMINI_LLM_MODEL`     | No       | `gemini-3.1-flash-lite` | LLM model name                |
-| `CORS_ORIGINS`         | No       | `http://localhost:5173` | Comma-separated allowed origins |
-| `APP_ENV`              | No       | `development`           | Application environment       |
-| `LOG_LEVEL`            | No       | `INFO`                  | Log verbosity                 |
-| `MAX_UPLOAD_BYTES`     | No       | `10485760`              | Maximum resume upload size    |
-| `EMBEDDING_DIMENSIONS` | No       | unset                   | Optional embedding vector length validation |
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | Yes | PostgreSQL connection string, usually Neon with SSL enabled |
+| `API_AUTH_TOKEN` | Production | Bearer token for protected API routes |
+| `GEMINI_API_KEY` | Yes | Gemini API key for profile extraction, requirement extraction, and embeddings |
+| `GEMINI_EMBEDDING_MODEL` | No | Defaults to `gemini-embedding-2` |
+| `GEMINI_LLM_MODEL` | No | Defaults to `gemini-3.1-flash-lite` |
+| `TAVILY_API_KEY` | Job search | Required for Tavily web search imports |
+| `CORS_ORIGINS` | No | Comma-separated allowed origins |
+| `APP_ENV` | No | Use `production` in deployed services |
+| `LOG_LEVEL` | No | Defaults to `INFO` |
+| `MAX_UPLOAD_BYTES` | No | Resume upload limit |
+| `GOOGLE_CLOUD_PROJECT` | Production | Used for Google Cloud integrations |
 
-### Frontend (`frontend/.env`)
+### Frontend `frontend/.env`
 
-| Variable        | Required | Default                  | Description             |
-| --------------- | -------- | ------------------------ | ----------------------- |
-| `VITE_API_URL`        | No       | `/api`                  | Backend API base URL or relative proxy path |
-| `VITE_API_AUTH_TOKEN` | No       | unset                   | Optional bearer token for local/private deployments |
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `VITE_API_URL` | No | API base URL. Empty uses `/api` |
+| `VITE_API_AUTH_TOKEN` | No | Local/private helper only. Do not treat it as a browser secret |
 
-For the frontend Docker image, leave `VITE_API_URL` empty and set runtime `BACKEND_URL`
-to the backend service URL so Nginx can proxy `/api/*`. In production, set
-runtime `API_AUTH_TOKEN` from Secret Manager on the frontend service so Nginx can
-authenticate backend API requests without exposing the token in browser
-JavaScript.
+For the production frontend container, keep `VITE_API_URL` empty and set `BACKEND_URL` plus `API_AUTH_TOKEN` on Cloud Run. Nginx proxies `/api/*` to the backend and attaches the backend token from the server environment.
 
----
+## Running Tests
+
+```bash
+pytest
+ruff check .
+mypy backend
+```
+
+Frontend build:
+
+```bash
+cd frontend
+npm run build
+```
 
 ## Docker
 
-### Build backend
+### Backend
 
 ```bash
 docker build -f Dockerfile.backend -t careerfit-backend .
 docker run -p 8080:8080 --env-file .env careerfit-backend
 ```
 
-### Build frontend
+### Frontend
 
 ```bash
-docker build -f Dockerfile.frontend \
-  -t careerfit-frontend .
+docker build -f Dockerfile.frontend -t careerfit-frontend .
 docker run -p 8080:8080 -e BACKEND_URL=http://your-backend-url careerfit-frontend
 ```
 
-### GCP deployment
+## Deployment
 
-See [`docs/DEPLOYMENT_GCP.md`](docs/DEPLOYMENT_GCP.md) for the Cloud Run,
-Secret Manager, Cloud Scheduler, and Cloud Logging deployment runbook.
+The current deployment path uses Google Cloud Run:
 
----
+- Backend API on Cloud Run.
+- Frontend React build served by Nginx on Cloud Run.
+- Artifact Registry and Cloud Build for images.
+- Secret Manager for database URL and API keys.
+- Cloud Scheduler for weekday job discovery runs.
+- Cloud Logging for service logs.
 
-## Running Tests
+See [docs/DEPLOYMENT_GCP.md](docs/DEPLOYMENT_GCP.md) for the deployment runbook.
 
-```bash
-# All tests
-pytest
+## Main API Areas
 
-# With output
-pytest -v
+- `POST /resumes/upload` uploads and parses a resume.
+- `GET /resumes` lists stored resumes.
+- `GET /profiles` lists extracted candidate profiles.
+- `POST /profiles/score-jobs` scores jobs against a profile.
+- `POST /sources/import/web-search` starts a web-search job import.
+- `GET /jobs` lists jobs with filters.
+- `POST /applications/jobs/{job_id}/save` saves a job to the application tracker.
+- `GET /exports/jobs.csv` exports jobs.
+- `GET /health/ready` checks database and Gemini readiness.
 
-# Backend tests only
-pytest tests/ -k "not frontend"
-```
+## Notes
 
----
-
-## Code Quality
-
-```bash
-# Lint and format
-ruff check .
-ruff format .
-
-# Type checking
-mypy backend
-```
-
----
-
-## User Flow
-
-1. **Upload Resume** — Upload a PDF or DOCX resume. Gemini extracts your candidate profile.
-2. **Find Jobs** — Import jobs from approved ATS search results. Add jobs manually.
-3. **Review Matches** — Browse scored job matches. Filter by status or source.
-4. **Save Jobs** — Save jobs you want to track.
-5. **Track Applications** — Update application status as you progress through interviews.
-
----
-
-## API Reference
-
-The FastAPI backend provides interactive docs at `/docs` (Swagger UI) and `/redoc`.
-
-Key endpoint groups:
-
-- `POST /resumes/upload` — Upload and parse a resume
-- `GET /jobs` — List jobs with optional search/filter
-- `POST /sources/import/{source}` — Import jobs from a source
-- `POST /sources/import/web-search` — Trigger the scheduled job discovery workflow
-- `GET /applications` — List tracked applications
-- `GET /exports/jobs.csv` — Export job data as CSV
-- `GET /health/ready` — Health check with database and Gemini status
+This is intentionally not an automatic application or outreach tool. It does not scrape private job boards, bypass CAPTCHA, or submit applications for the user. The focus is on a cleaner job discovery workflow, explainable matching, and enough deployment discipline to run it like a small real product.
