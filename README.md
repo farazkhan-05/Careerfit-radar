@@ -2,6 +2,8 @@
 
 CareerFit Radar is a full-stack job search project that connects resume parsing, job discovery, semantic matching, fit scoring, and application tracking in one workflow.
 
+Live app: https://careerfit-frontend-j2u2chbc6q-uc.a.run.app/
+
 The goal is simple: upload a resume, bring in relevant job listings, compare each role against the candidate profile, and keep track of the jobs that are worth acting on. It is built as a practical solo developer project with production minded pieces such as API auth, migrations, tests, Docker builds, Cloud Run deployment, scheduled search, and secret management.
 
 ## What It Does
