@@ -25,6 +25,7 @@ from backend.security import require_api_auth, require_bulk_delete_confirmation
 from backend.services.scoring_service import FitScoringService, ScorableJobRequirement
 from backend.utils.text_utils import normalize_for_match
 
+
 router = APIRouter(
     prefix="/profiles",
     tags=["profiles"],
@@ -37,7 +38,11 @@ def create_profile(
     payload: CandidateProfileCreate,
     db: Session = Depends(get_db),
 ) -> db_models.CandidateProfile:
-    return create_entity(db, db_models.CandidateProfile, payload)
+    return create_entity(
+        db,
+        db_models.CandidateProfile,
+        payload,
+    )
 
 
 @router.get("", response_model=PageResponse)
@@ -59,7 +64,11 @@ def get_profile(
     profile_id: UUID,
     db: Session = Depends(get_db),
 ) -> db_models.CandidateProfile:
-    return get_or_404(db, db_models.CandidateProfile, profile_id)
+    return get_or_404(
+        db,
+        db_models.CandidateProfile,
+        profile_id,
+    )
 
 
 @router.patch("/{profile_id}", response_model=CandidateProfileRead)
@@ -114,12 +123,16 @@ def score_jobs(
     )
 
     remaining_before = db.execute(
-        select(func.count()).select_from(unscored_jobs.subquery())
+        select(func.count()).select_from(
+            unscored_jobs.subquery()
+        )
     ).scalar_one()
 
     jobs = db.execute(
         unscored_jobs
-        .options(selectinload(db_models.Job.requirements))
+        .options(
+            selectinload(db_models.Job.requirements)
+        )
         .order_by(
             db_models.Job.fetched_at.desc(),
             db_models.Job.id,
@@ -128,7 +141,10 @@ def score_jobs(
     ).scalars().all()
 
     if not jobs:
-        total_scored = _count_scored_jobs(db, profile.id)
+        total_scored = _count_scored_jobs(
+            db,
+            profile.id,
+        )
 
         return {
             "scored": 0,
@@ -141,16 +157,21 @@ def score_jobs(
         }
 
     candidate_skills = _extract_all_skills(profile)
-
     service = FitScoringService()
 
     for job in jobs:
-        req = _requirements_for_scoring(job, candidate_skills)
+        req = _requirements_for_scoring(
+            job,
+            candidate_skills,
+        )
 
         result = service.score_job(
             job=job,
             candidate_profile=profile,
-            requirements=cast(ScorableJobRequirement, req),
+            requirements=cast(
+                ScorableJobRequirement,
+                req,
+            ),
         )
 
         db.add(
@@ -162,11 +183,16 @@ def score_jobs(
     db.commit()
 
     scored_count = len(jobs)
+
     remaining_unscored_count = max(
         int(remaining_before) - scored_count,
         0,
     )
-    total_scored = _count_scored_jobs(db, profile.id)
+
+    total_scored = _count_scored_jobs(
+        db,
+        profile.id,
+    )
 
     return {
         "scored": scored_count,
@@ -187,7 +213,8 @@ def _count_scored_jobs(
             select(func.count())
             .select_from(db_models.JobScore)
             .where(
-                db_models.JobScore.candidate_profile_id == profile_id
+                db_models.JobScore.candidate_profile_id
+                == profile_id
             )
         ).scalar_one()
     )
@@ -195,15 +222,23 @@ def _count_scored_jobs(
 
 @dataclass
 class _InferredReq:
-    required_skills: list[str] = field(default_factory=list)
-    preferred_skills: list[str] = field(default_factory=list)
+    required_skills: list[str] = field(
+        default_factory=list
+    )
+    preferred_skills: list[str] = field(
+        default_factory=list
+    )
     min_experience_years: float | None = None
 
 
 @dataclass(frozen=True)
 class _StoredReq:
-    required_skills: list[str] = field(default_factory=list)
-    preferred_skills: list[str] = field(default_factory=list)
+    required_skills: list[str] = field(
+        default_factory=list
+    )
+    preferred_skills: list[str] = field(
+        default_factory=list
+    )
     min_experience_years: float | None = None
 
 
@@ -228,7 +263,11 @@ def _extract_all_skills(
 ) -> list[str]:
     skills: list[str] = []
 
-    for value in getattr(profile, "skills", {}).values():
+    for value in getattr(
+        profile,
+        "skills",
+        {},
+    ).values():
         if isinstance(value, list):
             skills.extend(
                 str(skill)
@@ -244,17 +283,28 @@ def _extract_all_skills(
                         for skill in nested
                         if skill
                     )
+
                 elif nested:
-                    skills.append(str(nested))
+                    skills.append(
+                        str(nested)
+                    )
 
         elif value:
-            skills.append(str(value))
+            skills.append(
+                str(value)
+            )
 
-    for project in getattr(profile, "projects", []) or []:
+    for project in getattr(
+        profile,
+        "projects",
+        [],
+    ) or []:
         if isinstance(project, dict):
             skills.extend(
                 str(skill)
-                for skill in project.get("technologies") or []
+                for skill in project.get(
+                    "technologies"
+                ) or []
                 if skill
             )
 
@@ -265,7 +315,11 @@ def _requirements_for_scoring(
     job: db_models.Job,
     candidate_skills: list[str],
 ) -> _StoredReq | _InferredReq:
-    stored = getattr(job, "requirements", None)
+    stored = getattr(
+        job,
+        "requirements",
+        None,
+    )
 
     if stored is not None:
         return _StoredReq(
@@ -275,7 +329,9 @@ def _requirements_for_scoring(
             preferred_skills=_clean_requirement_list(
                 stored.preferred_skills
             ),
-            min_experience_years=stored.min_experience_years,
+            min_experience_years=(
+                stored.min_experience_years
+            ),
         )
 
     return _infer_requirements(
@@ -301,12 +357,15 @@ def _infer_requirements(
     description: str,
     candidate_skills: list[str],
 ) -> _InferredReq:
-    desc_norm = normalize_for_match(description)
+    desc_norm = normalize_for_match(
+        description
+    )
 
     found = [
         skill
         for skill in candidate_skills
-        if normalize_for_match(skill) in desc_norm
+        if normalize_for_match(skill)
+        in desc_norm
     ]
 
     exp: float | None = None
@@ -315,7 +374,9 @@ def _infer_requirements(
     for pattern in _EXP_PATTERNS:
         matches.extend(
             float(match)
-            for match in pattern.findall(description)
+            for match in pattern.findall(
+                description
+            )
         )
 
     if matches:
@@ -330,20 +391,31 @@ def _infer_requirements(
 @router.delete(
     "",
     status_code=204,
-    dependencies=[Depends(require_bulk_delete_confirmation)],
+    dependencies=[
+        Depends(
+            require_bulk_delete_confirmation
+        )
+    ],
 )
 def delete_all_profiles(
     db: Session = Depends(get_db),
 ):
     db.execute(
-        delete(db_models.CandidateProfile)
+        delete(
+            db_models.CandidateProfile
+        )
     )
     db.commit()
 
-    return Response(status_code=204)
+    return Response(
+        status_code=204
+    )
 
 
-@router.delete("/{profile_id}", status_code=204)
+@router.delete(
+    "/{profile_id}",
+    status_code=204,
+)
 def delete_profile(
     profile_id: UUID,
     db: Session = Depends(get_db),
@@ -352,3 +424,4 @@ def delete_profile(
         db,
         db_models.CandidateProfile,
         profile_id,
+    )
