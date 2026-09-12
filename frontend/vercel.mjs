@@ -10,12 +10,10 @@ export const config = {
   framework: 'vite',
 
   rewrites: [
-    routes.rewrite('/api/(.*)', `${backendUrl}/$1`, {
+    routes.rewrite('/api/:path*', `${backendUrl}/:path*`, {
       requestHeaders: {
         authorization: `Bearer ${deploymentEnv('API_AUTH_TOKEN')}`,
       },
     }),
-
-    routes.rewrite('/(.*)', '/index.html'),
   ],
 };
